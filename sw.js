@@ -1,23 +1,10 @@
-const CACHE_NAME = 'baan-jao-noo-v3';
-
-// Install: cache เฉพาะไฟล์หลัก
-self.addEventListener('install', event => {
-  self.skipWaiting();
-});
-
-// Activate: ลบ cache เก่าทั้งหมด
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.map(k => caches.delete(k)))
-    )
-  );
+// Service Worker - No Cache Version
+self.addEventListener('install', e => self.skipWaiting());
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))));
   self.clients.claim();
 });
-
-// Fetch: Network first เสมอ ไม่ cache
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request))
-  );
+// Network only - ไม่ cache เลย
+self.addEventListener('fetch', e => {
+  e.respondWith(fetch(e.request.url + (e.request.url.includes('?') ? '&' : '?') + '_t=' + Date.now()));
 });
