@@ -1,0 +1,2130 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🐹 บ้านเจ้าหนู — ระบบวิเคราะห์กำไร</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#c8873a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="บ้านเจ้าหนู">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--bg:#f7f5f0;--surface:#fff;--surface2:#f0ede6;--border:#e2ddd4;--text:#2c2416;--text2:#7a6e5f;--accent:#c8873a;--accent-light:#f5dfc0;--green:#3a7c5c;--green-light:#c8eada;--red:#c0392b;--red-light:#fde8e6;--blue:#2d6fa4;--blue-light:#d6eaf8;--yellow:#d4a017;--shadow:0 2px 12px rgba(44,36,22,.08);--radius:12px}
+[data-theme="dark"]{--bg:#1a1612;--surface:#252017;--surface2:#2e2820;--border:#3d3630;--text:#f0ead8;--text2:#a09070;--accent:#e8a050;--accent-light:#3d2e18;--green:#4a9c6c;--green-light:#1a3028;--red:#e05545;--red-light:#3d1a18;--blue:#4d8fc4;--blue-light:#1a2d3d;--yellow:#e4b027;--shadow:0 2px 12px rgba(0,0,0,.3)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Noto Sans Thai",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
+.header{background:var(--text);color:#f7f5f0;padding:0 24px;display:flex;align-items:center;gap:16px;height:56px;position:sticky;top:0;z-index:200}
+.header-logo{font-size:1.5rem}.header-title{font-size:1rem;font-weight:700}.header-sub{font-size:.75rem;color:#a09070;margin-left:auto;font-family:"IBM Plex Mono",monospace}
+.nav{background:var(--surface);border-bottom:2px solid var(--border);display:flex;overflow-x:auto}
+.nav-btn{padding:14px 20px;border:none;background:none;font-family:"Noto Sans Thai",sans-serif;font-size:.85rem;color:var(--text2);cursor:pointer;white-space:nowrap;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s;font-weight:500}
+.nav-btn:hover{color:var(--text)}.nav-btn.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:700}
+.page{display:none;padding:24px;max-width:1200px;margin:0 auto}.page.active{display:block}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
+.card-title{font-size:.9rem;font-weight:700;color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.stat-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow)}
+.stat-card .s-label{font-size:.75rem;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.stat-card .s-val{font-family:"IBM Plex Mono",monospace;font-size:1.5rem;font-weight:600;margin-top:4px}
+.stat-card .s-sub{font-size:.75rem;color:var(--text2);margin-top:2px}
+.s-green{color:var(--green)}.s-red{color:var(--red)}.s-accent{color:var(--accent)}.s-blue{color:var(--blue)}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group label{font-size:.78rem;font-weight:600;color:var(--text2)}
+.form-group input,.form-group select{border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-family:"Noto Sans Thai",sans-serif;font-size:.88rem;background:var(--bg);color:var(--text);transition:border-color .15s}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:var(--accent);background:#fff}
+.btn{padding:9px 18px;border:none;border-radius:8px;font-family:"Noto Sans Thai",sans-serif;font-size:.88rem;font-weight:600;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#b07530;transform:translateY(-1px)}
+.btn-green{background:var(--green);color:#fff}.btn-green:hover{background:#2d6347}
+.btn-outline{background:transparent;border:1.5px solid var(--border);color:var(--text)}.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+.btn-danger{background:transparent;border:1.5px solid var(--red);color:var(--red);padding:5px 10px;font-size:.78rem}.btn-danger:hover{background:var(--red-light)}
+.btn-sm{padding:6px 12px;font-size:.8rem}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+thead th{background:var(--surface2);padding:10px 12px;text-align:left;font-weight:700;font-size:.78rem;color:var(--text2);white-space:nowrap;border-bottom:2px solid var(--border)}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+tbody tr:hover{background:#faf8f4}
+tbody td{padding:10px 12px}
+.text-right{text-align:right;font-family:"IBM Plex Mono",monospace;font-size:.82rem}
+.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:.75rem;font-weight:600}
+.badge-done{background:var(--green-light);color:var(--green)}.badge-ship{background:var(--blue-light);color:var(--blue)}.badge-pend{background:var(--accent-light);color:var(--accent)}
+.sep{height:1px;background:var(--border);margin:20px 0}
+.helper{background:var(--accent-light);border-left:3px solid var(--accent);padding:10px 14px;border-radius:0 8px 8px 0;font-size:.82rem;line-height:1.6;margin-bottom:16px;color:var(--text)}
+.empty{text-align:center;padding:40px;color:var(--text2)}.empty .ei{font-size:2.5rem;margin-bottom:8px}
+.stock-bar{height:6px;border-radius:3px;background:var(--border);overflow:hidden;margin-top:4px}
+.stock-fill{height:100%;border-radius:3px;background:var(--green);transition:width .3s}
+.stock-low .stock-fill{background:var(--red)}.stock-med .stock-fill{background:var(--yellow)}
+.prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.prod-card{background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:14px;text-align:center}
+.prod-card .pc-icon{font-size:1.8rem;margin-bottom:6px}.prod-card .pc-name{font-size:.82rem;font-weight:700}
+.prod-card .pc-stock{font-size:.75rem;color:var(--text2);margin-top:3px}.prod-card .pc-cost{font-size:.78rem;color:var(--accent);font-family:"IBM Plex Mono",monospace;font-weight:600;margin-top:2px}
+.stock-low{border-color:var(--red)}.stock-med{border-color:var(--yellow)}
+.upload-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:32px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg)}
+.upload-zone:hover{border-color:var(--accent);background:var(--accent-light)}
+.upload-zone .uz-icon{font-size:2.5rem;margin-bottom:8px}.upload-zone .uz-text{font-size:.9rem;font-weight:600;margin-bottom:4px}.upload-zone .uz-sub{font-size:.78rem;color:var(--text2)}
+.file-ready{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--green-light);border-radius:8px;font-size:.85rem;margin-top:8px}
+.profit-pos{color:var(--green);font-weight:700}.profit-neg{color:var(--red);font-weight:700}
+.inner-tabs{display:flex;gap:4px;margin-bottom:16px;background:var(--surface2);padding:4px;border-radius:10px;width:fit-content}
+.inner-tab{padding:7px 16px;border:none;background:none;border-radius:7px;font-family:"Noto Sans Thai",sans-serif;font-size:.83rem;cursor:pointer;font-weight:500;color:var(--text2);transition:all .15s}
+.inner-tab.active{background:var(--surface);color:var(--accent);font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.chart-wrap{position:relative;height:280px}
+.notif{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:10px;font-size:.88rem;font-weight:600;z-index:9999;animation:slideIn .3s ease;box-shadow:0 4px 16px rgba(0,0,0,.15)}
+.notif-success{background:var(--green);color:#fff}.notif-error{background:var(--red);color:#fff}.notif-info{background:var(--blue);color:#fff}
+@keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+@media(max-width:600px){.page{padding:14px}.stat-row{grid-template-columns:1fr 1fr}.form-grid{grid-template-columns:1fr}.prod-grid{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+<div class="header"><div class="header-logo">🐹</div><div class="header-title">บ้านเจ้าหนู — ระบบวิเคราะห์กำไร</div>
+<div id="sync-status" style="font-size:.75rem;color:#a09070;font-family:'IBM Plex Mono',monospace;margin-left:12px">🔄 Connecting...</div>
+<div class="header-sub">TikTok Shop</div>
+<button onclick="toggleDarkMode()" id="dark-btn" style="margin-left:auto;background:none;border:1px solid rgba(255,255,255,.3);color:#f7f5f0;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:.85rem;font-family:'Noto Sans Thai',sans-serif">🌙 Dark</button>
+</div>
+<nav class="nav">
+  <button class="nav-btn active" onclick="showPage('p-stock')">🌿 สต็อกผักผลไม้</button>
+  <button class="nav-btn" onclick="showPage('p-import')">📂 นำเข้า TikTok</button>
+  <button class="nav-btn" onclick="showPage('p-manual')">📝 บันทึกขายเอง</button>
+  <button class="nav-btn" onclick="showPage('p-profit')">📊 วิเคราะห์กำไร</button>
+  <button class="nav-btn" onclick="showPage('p-settings')">⚙️ ตั้งค่า</button>
+  <button class="nav-btn" onclick="showPage('p-backup')">💾 Export/Import</button>
+</nav>
+
+<!-- STOCK PAGE -->
+<div id="p-stock" class="page active">
+  <div class="inner-tabs">
+    <button class="inner-tab active" onclick="showInnerStock('stock-fresh',this)">🥬 ผักสด</button>
+    <button class="inner-tab" onclick="showInnerStock('stock-dry',this)">🥕 อบแห้ง</button>
+    <button class="inner-tab" onclick="showInnerStock('stock-box',this)">📦 กล่องพัสดุ</button>
+  </div>
+  <div id="stock-fresh">
+    <div class="card"><div class="card-title"><span>🛒</span>บันทึกการซื้อผักผลไม้สด</div>
+      <div class="form-grid" style="margin-bottom:14px">
+        <div class="form-group"><label>วันที่ซื้อ</label><input type="date" id="f-date"></div>
+        <div class="form-group"><label>ค่าเดินทาง (฿) <span style="font-size:.75rem;color:var(--text2)">หารเท่ากันทุกชนิด</span></label><input type="number" id="f-travel" placeholder="0" step="0.01" value="0" oninput="updateFreshTravelPreview()"></div>
+      </div>
+      <div style="font-size:.82rem;font-weight:700;color:var(--text2);margin-bottom:8px">ผักผลไม้ที่ซื้อ (เพิ่มได้หลายชนิด)</div>
+      <div id="f-items-list"></div>
+      <button class="btn btn-outline btn-sm" onclick="addFreshBuyItem()" style="margin-bottom:12px">+ เพิ่มผัก/ผลไม้</button>
+      <div id="f-travel-preview" style="display:none;font-size:.82rem;color:var(--green);margin-bottom:12px"></div>
+      <div id="f-summary" style="display:none;padding:12px 14px;background:var(--surface2);border-radius:8px;margin-bottom:12px;font-size:.84rem"></div>
+      <button class="btn btn-primary" onclick="saveFreshPurchase()">💾 บันทึกการซื้อ</button>
+    </div>
+    <div class="card"><div class="card-title"><span>🌿</span>สต็อกผักสดคงเหลือ</div><div id="fresh-stock-grid" class="prod-grid"></div></div>
+    <div class="card"><div class="card-title"><span>🍽️</span>ปรับลด (กินเอง/ทิ้ง)</div>
+      <div class="helper">ใช้เมื่อเอาผักไปกินเองหรือทิ้ง — ไม่นับเป็นต้นทุนการขาย</div>
+      <div class="form-grid">
+        <div class="form-group"><label>ชื่อ</label><select id="adj-name"><option value="">-- เลือก --</option><option>ข้าวโพด</option><option>แครอท</option><option>ฟักทอง</option><option>แอปเปิ้ล</option><option>แตงกวา</option><option>บล็อคโคลี่</option><option>บวบ</option><option>กล้วย</option><option>ส้มแมนดาริน</option></select></div>
+        <div class="form-group"><label>จำนวนที่ปรับลด</label><input type="number" id="adj-qty" placeholder="0" step="0.1"></div>
+        <div class="form-group"><label>เหตุผล</label><input type="text" id="adj-reason" placeholder="เช่น กินเอง"></div>
+      </div>
+      <div style="margin-top:14px"><button class="btn btn-outline" onclick="adjustFreshStock()">📉 ปรับลด</button></div>
+    </div>
+    <div class="card"><div class="card-title"><span>📋</span>ประวัติการซื้อ</div>
+      <div class="tbl-wrap"><table><thead><tr><th>วันที่</th><th>ชื่อ</th><th>ราคา</th><th>จำนวน</th><th>เหลือ</th><th>สถานะ</th><th></th></tr></thead><tbody id="fresh-tbody"></tbody></table></div>
+    </div>
+  </div>
+  <div id="stock-dry" style="display:none">
+    <div class="card"><div class="card-title"><span>🔥</span>บันทึกการอบแห้ง (Lot ใหม่)</div>
+      <div style="font-size:.82rem;font-weight:700;color:var(--text2);margin-bottom:8px">① วัตถุดิบที่ใช้อบ</div>
+      <div class="form-grid" style="margin-bottom:12px;grid-template-columns:1fr">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group"><label>วันที่อบ</label><input type="date" id="d-date"></div>
+          <div class="form-group"><label>ชั่วโมงอบ</label><input type="number" id="d-hours" placeholder="5" step="0.5" oninput="previewDryCost()"></div>
+        </div>
+      </div>
+      <div id="dry-fresh-inputs"></div>
+      <button class="btn btn-outline btn-sm" onclick="addFreshInput()" style="margin-bottom:16px">+ เพิ่มวัตถุดิบ</button>
+      <div id="d-fresh-info" style="display:none;margin-bottom:12px;padding:10px 14px;background:var(--green-light);border-radius:8px;font-size:.83rem"></div>
+      <div style="font-size:.82rem;font-weight:700;color:var(--text2);margin-bottom:8px">② ผลผลิตที่ได้</div>
+      <div id="dry-outputs"></div>
+      <button class="btn btn-outline btn-sm" onclick="addDryOutput()" style="margin-bottom:16px">+ เพิ่มชนิดผลผลิต</button>
+      <div id="dry-preview" style="padding:12px 14px;background:var(--accent-light);border-radius:8px;font-size:.84rem;display:none;margin-bottom:14px"></div>
+      <button class="btn btn-primary" onclick="saveDryLot()">💾 บันทึก Lot</button>
+    </div>
+    <div class="card"><div class="card-title"><span>📦</span>สต็อกผักผลไม้อบแห้งคงเหลือ</div><div id="dry-stock-grid" class="prod-grid"></div></div>
+
+    <div class="card"><div class="card-title"><span>📉</span>ปรับลดถุงอบแห้ง (เสียหาย / ให้แฮม / ตัวอย่าง)</div>
+      <div class="helper">ของที่ขายไม่ได้ — ระบบจะตัดสต็อก และบันทึกเป็นค่าใช้จ่ายตามต้นทุน FIFO</div>
+      <div class="form-grid">
+        <div class="form-group"><label>ชนิด</label>
+          <select id="da-name">
+            <option value="">-- เลือก --</option>
+            <option>ข้าวโพด 3 แว่น</option><option>แครอท</option><option>ฟักทอง</option>
+            <option>แอปเปิ้ล</option><option>แตงกวา</option><option>บล็อคโคลี่</option>
+            <option>บวบ</option><option>กล้วย</option><option>ส้มแมนดาริน</option><option>ข้าวโพด 6 แว่น</option>
+          </select>
+        </div>
+        <div class="form-group"><label>จำนวนถุง</label><input type="number" id="da-qty" placeholder="0" min="1" step="1"></div>
+        <div class="form-group"><label>เหตุผล</label>
+          <select id="da-reason">
+            <option value="ให้แฮมที่บ้าน 🐹">ให้แฮมที่บ้าน 🐹</option>
+            <option value="เสียหาย/สีไม่สวย">เสียหาย/สีไม่สวย</option>
+            <option value="ตัวอย่างลูกค้า">ตัวอย่างลูกค้า</option>
+            <option value="ทดสอบรสชาติ">ทดสอบรสชาติ</option>
+            <option value="อื่นๆ">อื่นๆ</option>
+          </select>
+        </div>
+        <div class="form-group"><label>หมายเหตุเพิ่มเติม</label><input type="text" id="da-note" placeholder="(ไม่บังคับ)"></div>
+      </div>
+      <div id="da-preview" style="display:none;margin-top:10px;padding:8px 14px;background:var(--red-light);border-radius:8px;font-size:.83rem"></div>
+      <div style="margin-top:12px"><button class="btn btn-outline" onclick="adjustDryStock()">📉 บันทึกการปรับลด</button></div>
+    </div>
+
+    <div class="card"><div class="card-title"><span>🗂️</span>ประวัติ Lot อบแห้ง (FIFO)</div>
+      <div class="tbl-wrap"><table><thead><tr><th>วันที่</th><th>วัตถุดิบ</th><th>ต้นทุน</th><th>ค่าไฟ</th><th>ชนิด</th><th>ค่าถุง</th><th>ถุงทั้งหมด</th><th>ขายแล้ว</th><th>เหลือ</th><th>เศษ</th><th>฿/ถุง</th><th></th></tr></thead><tbody id="dry-lots-tbody"></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- BOX STOCK -->
+  <div id="stock-box" style="display:none">
+    <div class="card"><div class="card-title"><span>📦</span>บันทึกซื้อกล่องพัสดุ</div>
+      <div class="form-grid">
+        <div class="form-group"><label>ประเภทกล่อง</label>
+          <select id="box-type">
+            <option value="AB">กล่อง AB (3-4 ถุง)</option>
+            <option value="B">กล่อง B (5+ ถุง / มีข้าวโพด 6 แว่น)</option>
+          </select>
+        </div>
+        <div class="form-group"><label>วันที่ซื้อ</label><input type="date" id="box-date"></div>
+        <div class="form-group"><label>จำนวน (ใบ)</label><input type="number" id="box-qty" placeholder="0" min="1" step="1"></div>
+        <div class="form-group"><label>ราคา/ใบ (฿)</label><input type="number" id="box-price" placeholder="0.00" step="0.01"></div>
+      </div>
+      <div id="box-preview" style="display:none;margin-top:10px;padding:8px 14px;background:var(--accent-light);border-radius:8px;font-size:.83rem"></div>
+      <div style="margin-top:14px"><button class="btn btn-primary" onclick="saveBoxLot()">+ บันทึก</button></div>
+    </div>
+
+    <div class="card"><div class="card-title"><span>📊</span>สต็อกกล่องพัสดุคงเหลือ</div>
+      <div id="box-stock-grid" class="prod-grid"></div>
+    </div>
+
+    <div class="card"><div class="card-title"><span>🗂️</span>ประวัติ Lot กล่อง (FIFO)</div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>วันที่</th><th>ประเภท</th><th>จำนวน</th><th>ใช้แล้ว</th><th>เหลือ</th><th>ราคา/ใบ</th><th></th></tr></thead>
+        <tbody id="box-lots-tbody"></tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+
+<!-- MANUAL SALE PAGE -->
+<div id="p-manual" class="page">
+  <div class="helper">📝 บันทึกการขายจากช่องทางอื่นที่ไม่ใช่ TikTok — ระบบจะตัดสต็อก FIFO และคำนวณกำไรให้อัตโนมัติ</div>
+  <div class="card"><div class="card-title"><span>🛍️</span>บันทึกการขายใหม่</div>
+    <div class="form-grid">
+      <div class="form-group"><label>วันที่</label><input type="date" id="m-date"></div>
+      <div class="form-group"><label>แพลตฟอร์ม</label>
+        <select id="m-platform">
+          <option value="Shopee">Shopee</option>
+          <option value="Facebook">Facebook</option>
+          <option value="Line OA">Line OA</option>
+          <option value="Lazada">Lazada</option>
+          <option value="อื่นๆ">อื่นๆ</option>
+        </select>
+      </div>
+      <div class="form-group"><label>ชื่อแพลตฟอร์ม (ถ้าอื่นๆ)</label><input type="text" id="m-platform-custom" placeholder="เช่น Instagram"></div>
+      <div class="form-group"><label>ราคาขายรวม (฿)</label><input type="number" id="m-revenue" placeholder="0.00" step="0.01"></div>
+      <div class="form-group"><label>ค่าบริการแพลตฟอร์ม (%)</label><input type="number" id="m-fee-pct" placeholder="0" step="0.1" value="0"></div>
+      <div class="form-group"><label>ค่าส่ง (฿)</label><input type="number" id="m-shipping" placeholder="0" step="0.01" value="0"></div>
+    </div>
+    <div style="margin-top:14px;margin-bottom:8px;font-size:.82rem;font-weight:700;color:var(--text2)">สินค้าที่ขาย</div>
+    <div id="m-items"></div>
+    <button class="btn btn-outline btn-sm" onclick="addManualItem()" style="margin-bottom:14px">+ เพิ่มสินค้า</button>
+    <div id="m-preview" style="display:none;padding:12px 14px;background:var(--accent-light);border-radius:8px;font-size:.84rem;margin-bottom:14px"></div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-green" onclick="calcManual()">🔍 คำนวณ</button>
+      <button class="btn btn-primary" onclick="saveManualSale()">💾 บันทึก</button>
+    </div>
+  </div>
+  <div class="card"><div class="card-title"><span>📋</span>ประวัติการขายช่องทางอื่น</div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <select id="m-filter-platform" onchange="renderManualList()" style="border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-family:'Noto Sans Thai',sans-serif;font-size:.85rem;background:#fff">
+        <option value="">ทุกแพลตฟอร์ม</option>
+        <option>Shopee</option><option>Facebook</option><option>Line OA</option><option>Lazada</option><option>อื่นๆ</option>
+      </select>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>วันที่</th><th>แพลตฟอร์ม</th><th>สินค้า</th><th class="text-right">รายได้</th><th class="text-right">ต้นทุน</th><th class="text-right">ค่าแพ็ค</th><th class="text-right">ค่าบริการ</th><th class="text-right">กำไร</th><th class="text-right">Margin%</th><th></th></tr></thead>
+      <tbody id="manual-tbody"></tbody>
+    </table></div>
+  </div>
+
+  <!-- บันทึกรอบส่ง -->
+  <div class="card"><div class="card-title"><span>🚚</span>บันทึกรอบส่ง</div>
+    <div class="helper">เลือกออเดอร์ที่ส่งในรอบเดียวกัน → ระบบ recalc ค่าน้ำมันหาร ÷ จำนวนออเดอร์รวม</div>
+    <div class="form-grid" style="margin-bottom:14px">
+      <div class="form-group"><label>วันที่ส่ง</label><input type="date" id="dr-date" oninput="renderDeliveryRoundPicker()"></div>
+      <div class="form-group"><label>รอบ</label>
+        <select id="dr-round">
+          <option value="เช้า">🌅 รอบเช้า</option>
+          <option value="บ่าย">🌞 รอบบ่าย</option>
+        </select>
+      </div>
+    </div>
+    <div style="font-size:.82rem;font-weight:700;color:var(--text2);margin-bottom:8px">เลือกออเดอร์ในรอบนี้</div>
+    <div id="dr-order-picker" style="max-height:300px;overflow-y:auto;border:1.5px solid var(--border);border-radius:8px;padding:10px;margin-bottom:14px">
+      <div style="color:var(--text2);font-size:.83rem">เลือกวันที่ก่อนค่ะ</div>
+    </div>
+    <div id="dr-preview" style="display:none;padding:10px 14px;background:var(--accent-light);border-radius:8px;font-size:.83rem;margin-bottom:14px"></div>
+    <button class="btn btn-primary" onclick="saveDeliveryRound()">💾 บันทึกรอบส่ง</button>
+  </div>
+
+  <!-- ประวัติรอบส่ง -->
+  <div class="card"><div class="card-title"><span>🗓️</span>ประวัติรอบส่ง</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>วันที่</th><th>รอบ</th><th>ออเดอร์</th><th class="text-right">ยานพาหนะ</th><th class="text-right">ค่าน้ำมัน/รอบ</th><th class="text-right">ค่าน้ำมัน/ออเดอร์</th><th></th></tr></thead>
+      <tbody id="dr-tbody"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- IMPORT PAGE -->
+<div id="p-import" class="page">
+  <div class="helper">📌 อัพโหลด <b>Order Report (.csv)</b> และ <b>Income Report (.xlsx)</b> จาก TikTok Shop<br>ระบบจะ join ด้วย Order ID, ตรวจซ้ำ, อัพเดท fee และตัดสต็อกอัตโนมัติ</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+    <div class="card" style="margin-bottom:0"><div class="card-title"><span>📄</span>Order Report (.csv)</div>
+      <div class="upload-zone" onclick="document.getElementById('inp-csv').click()" id="zone-csv" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleDrop(event,'csv')">
+        <div class="uz-icon">📋</div><div class="uz-text">คลิกหรือลากไฟล์มาวาง</div><div class="uz-sub">.csv จาก Orders</div>
+      </div>
+      <input type="file" id="inp-csv" accept=".csv" style="display:none" onchange="loadCSV(this)">
+      <div id="csv-status"></div>
+    </div>
+    <div class="card" style="margin-bottom:0"><div class="card-title"><span>💰</span>Income Report (.xlsx)</div>
+      <div class="upload-zone" onclick="document.getElementById('inp-xlsx').click()" id="zone-xlsx" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleDrop(event,'xlsx')">
+        <div class="uz-icon">📊</div><div class="uz-text">คลิกหรือลากไฟล์มาวาง</div><div class="uz-sub">.xlsx จาก Finance</div>
+      </div>
+      <input type="file" id="inp-xlsx" accept=".xlsx" style="display:none" onchange="loadXLSX(this)">
+      <div id="xlsx-status"></div>
+    </div>
+  </div>
+  <div id="import-preview" style="display:none">
+    <div class="card"><div class="card-title"><span>🔍</span>Preview ก่อน Import</div>
+      <div id="preview-stats" class="stat-row" style="margin-bottom:16px"></div>
+      <div class="tbl-wrap"><table><thead><tr><th>Order ID</th><th>วันที่</th><th>สถานะ</th><th>สินค้า</th><th>ซอง</th><th>รายได้</th><th>ต้นทุน</th><th>ค่าแพ็ค</th><th>TikTok Fee</th><th>กำไร</th></tr></thead><tbody id="preview-tbody"></tbody></table></div>
+      <div style="margin-top:16px;display:flex;gap:12px">
+        <button class="btn btn-primary" onclick="confirmImport()">✅ ยืนยัน Import</button>
+        <button class="btn btn-outline" onclick="cancelImport()">ยกเลิก</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PROFIT PAGE -->
+<div id="p-profit" class="page">
+  <div class="inner-tabs">
+    <button class="inner-tab active" onclick="showInner('pr-overview','pr-orders',this);renderOverview()">📊 ภาพรวม</button>
+    <button class="inner-tab" onclick="showInner('pr-orders','pr-overview',this);renderOrders()">📋 รายออเดอร์</button>
+  </div>
+  <div id="pr-overview">
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+      <select id="filter-year" onchange="renderOverview()" style="border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-family:'Noto Sans Thai',sans-serif;font-size:.85rem;background:var(--surface)">
+        <option value="">ทุกปี</option>
+      </select>
+      <select id="filter-month" onchange="renderOverview()" style="border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-family:'Noto Sans Thai',sans-serif;font-size:.85rem;background:var(--surface)">
+        <option value="">ทุกเดือน</option>
+        <option value="01">มกราคม</option><option value="02">กุมภาพันธ์</option><option value="03">มีนาคม</option>
+        <option value="04">เมษายน</option><option value="05">พฤษภาคม</option><option value="06">มิถุนายน</option>
+        <option value="07">กรกฎาคม</option><option value="08">สิงหาคม</option><option value="09">กันยายน</option>
+        <option value="10">ตุลาคม</option><option value="11">พฤศจิกายน</option><option value="12">ธันวาคม</option>
+      </select>
+      <button class="btn btn-outline btn-sm" onclick="clearOverviewFilters()">✕ ล้าง</button>
+      <div id="overview-filter-label" style="font-size:.82rem;color:var(--text2)"></div>
+    </div>
+    <div id="overview-stats" class="stat-row"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="card"><div class="card-title"><span>🏆</span>กำไรต่อชนิด (฿)</div><div class="chart-wrap"><canvas id="chart-profit"></canvas></div></div>
+      <div class="card"><div class="card-title"><span>📦</span>ยอดขายต่อชนิด (ถุง)</div><div class="chart-wrap"><canvas id="chart-qty"></canvas></div></div>
+    </div>
+    <div class="card"><div class="card-title"><span>📈</span>กำไรรายวัน (30 วันล่าสุด)</div><div class="chart-wrap"><canvas id="chart-daily"></canvas></div></div>
+    <div class="card"><div class="card-title"><span>📈</span>สรุปกำไรแต่ละชนิด</div>
+      <div class="tbl-wrap"><table><thead><tr><th>ชนิด</th><th class="text-right">ถุงขาย</th><th class="text-right">รายได้</th><th class="text-right">ต้นทุน</th><th class="text-right">กำไร</th><th class="text-right">กำไร/ถุง</th><th class="text-right">Margin%</th></tr></thead><tbody id="product-summary-tbody"></tbody></table></div>
+    </div>
+  </div>
+  <div id="pr-orders" style="display:none">
+    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+      <select id="filter-status" onchange="renderOrders()" style="border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-family:'Noto Sans Thai',sans-serif;font-size:.85rem;background:#fff">
+        <option value="">ทุกสถานะ</option><option value="เสร็จสมบูรณ์">เสร็จสมบูรณ์</option><option value="จัดส่งแล้ว">จัดส่งแล้ว</option><option value="ที่จะจัดส่ง">ที่จะจัดส่ง</option>
+      </select>
+      <input type="date" id="filter-date-from" onchange="renderOrders()" style="border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-family:'Noto Sans Thai',sans-serif;font-size:.85rem;background:#fff">
+      <span style="color:var(--text2);font-size:.85rem">ถึง</span>
+      <input type="date" id="filter-date-to" onchange="renderOrders()" style="border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-family:'Noto Sans Thai',sans-serif;font-size:.85rem;background:#fff">
+      <button class="btn btn-outline btn-sm" onclick="clearOrderFilters()">✕ ล้าง</button>
+      <div id="order-count" style="font-size:.82rem;color:var(--text2)"></div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="tbl-wrap"><table><thead><tr><th>Order ID</th><th>วันที่</th><th>สถานะ</th><th>สินค้า</th><th class="text-right">ซอง</th><th class="text-right">รายได้</th><th class="text-right">ต้นทุน</th><th class="text-right">ค่าแพ็ค</th><th class="text-right">TikTok Fee</th><th class="text-right">กำไร</th><th class="text-right">Margin%</th></tr></thead><tbody id="orders-tbody"></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS PAGE -->
+<div id="p-settings" class="page">
+  <div class="card"><div class="card-title"><span>🛍️</span>ราคาถุงซอง</div>
+    <div class="helper">ฟักทอง → 12x20 | ข้าวโพด 6 แว่น → 15x22 | ที่เหลือ → 12x17</div>
+    <div class="form-grid">
+      <div class="form-group"><label>ถุงใส 12x17 (฿/ถุง)</label><input type="number" id="set-bag1217" step="0.001"></div>
+      <div class="form-group"><label>ถุงใส 12x20 (฿/ถุง) — ฟักทอง</label><input type="number" id="set-bag1220" step="0.001"></div>
+      <div class="form-group"><label>ถุงใส 15x22 (฿/ถุง) — ข้าวโพด 6 แว่น</label><input type="number" id="set-bag1522" step="0.001"></div>
+      <div class="form-group"><label>กันชื้น (฿/ถุง)</label><input type="number" id="set-kanchuean" step="0.01"></div>
+    </div>
+    <div style="margin-top:14px"><button class="btn btn-primary" onclick="saveBagSettings()">💾 บันทึก</button></div>
+  </div>
+  <div class="card"><div class="card-title"><span>🏷️</span>สติ๊กเกอร์ตราบ้านเจ้าหนู</div>
+    <div class="helper">คิด 1 ชิ้น/ถุง บวกเข้าต้นทุนสินค้าอัตโนมัติ</div>
+    <div class="form-grid">
+      <div class="form-group"><label>ราคาสติ๊กเกอร์ (฿/ชิ้น)</label><input type="number" id="set-sticker" step="0.001" placeholder="0.181"></div>
+    </div>
+    <div style="margin-top:14px"><button class="btn btn-primary" onclick="saveStickerSettings()">💾 บันทึก</button></div>
+  </div>
+  <div class="card"><div class="card-title"><span>⚡</span>ค่าไฟ</div>
+    <div class="form-grid"><div class="form-group"><label>ค่าไฟ (฿/ชั่วโมง)</label><input type="number" id="set-elec" step="0.1"></div></div>
+    <div style="margin-top:14px"><button class="btn btn-primary" onclick="saveElecSettings()">💾 บันทึก</button></div>
+  </div>
+  <div class="card"><div class="card-title"><span>📦</span>ค่าแพ็คของ <span style="font-size:.75rem;color:var(--text2);font-weight:400">(ออเดอร์ก่อน 23/05/2026)</span></div>
+    <div class="form-grid">
+      <div class="form-group"><label>1-2 ถุง (ถุงบับเบิ้ล)</label><input type="number" id="set-pack1" step="0.01"></div>
+      <div class="form-group"><label>3-4 ถุง (กล่อง AB + บับเบิ้ล)</label><input type="number" id="set-pack2" step="0.01"></div>
+      <div class="form-group"><label>5+ ถุง / มีข้าวโพด 6 แว่น (กล่อง B + บับเบิ้ล)</label><input type="number" id="set-pack3" step="0.01"></div>
+    </div>
+    <div style="margin-top:14px"><button class="btn btn-primary" onclick="savePackSettings()">💾 บันทึก</button></div>
+  </div>
+  <div class="card"><div class="card-title"><span>🚗</span>ค่าขนส่ง</div>
+    <div class="helper">คำนวณจาก Shipped Time ในไฟล์ TikTok ตั้งแต่ 23/05/2026 เป็นต้นไป</div>
+    <div class="form-grid">
+      <div class="form-group"><label>ราคาแก๊สโซฮอล์ 91 (฿/ลิตร) — Scoopy</label><input type="number" id="set-fuel91" step="0.01" value="43.68"></div>
+      <div class="form-group"><label>ราคาแก๊สโซฮอล์ 95 (฿/ลิตร) — รถยนต์</label><input type="number" id="set-fuel95" step="0.01" value="44.05"></div>
+      <div class="form-group"><label>อัตราสิ้นเปลือง Scoopy (กม./ลิตร)</label><input type="number" id="set-moto-kmpl" step="0.1" value="45.3"></div>
+      <div class="form-group"><label>อัตราสิ้นเปลือง รถยนต์ (กม./ลิตร)</label><input type="number" id="set-car-kmpl" step="0.1" value="23.6"></div>
+      <div class="form-group"><label>ระยะทางไป-กลับ (กม.)</label><input type="number" id="set-delivery-km" step="0.1" value="4"></div>
+      <div class="form-group"><label>เกณฑ์ใช้รถยนต์ (ออเดอร์ขึ้นไป)</label><input type="number" id="set-car-threshold" step="1" value="14"></div>
+      <div class="form-group"><label>วันเริ่มนับ</label><input type="date" id="set-delivery-start" value="2026-05-23"></div>
+    </div>
+    <div style="margin-top:14px"><button class="btn btn-primary" onclick="saveDeliverySettings()">💾 บันทึก</button></div>
+  </div>
+  <div class="card"><div class="card-title"><span>⚡</span>ค่าไฟ</div>
+    <div class="form-grid"><div class="form-group"><label>ค่าไฟ (฿/ชั่วโมง)</label><input type="number" id="set-elec" step="0.1"></div></div>
+    <div style="margin-top:14px"><button class="btn btn-primary" onclick="saveElecSettings()">💾 บันทึก</button></div>
+  </div>
+</div>
+
+<!-- BACKUP PAGE -->
+<div id="p-backup" class="page">
+  <div class="card"><div class="card-title"><span>📊</span>Export รายงาน Excel</div>
+    <p style="font-size:.85rem;color:var(--text2);margin-bottom:14px">สรุปกำไร ยอดขาย และข้อมูลธุรกิจรายเดือน</p>
+    <button class="btn btn-green" onclick="exportExcel()">📥 ดาวน์โหลด Report.xlsx</button>
+  </div>
+  <div class="card"><div class="card-title"><span>📤</span>Export ข้อมูล</div>
+    <p style="font-size:.85rem;color:var(--text2);margin-bottom:14px">ดาวน์โหลดข้อมูลทั้งหมดเป็นไฟล์ JSON</p>
+    <button class="btn btn-primary" onclick="exportData()">📥 ดาวน์โหลด backup.json</button>
+  </div>
+  <div class="card"><div class="card-title"><span>📥</span>Import ข้อมูล</div>
+    <p style="font-size:.85rem;color:var(--text2);margin-bottom:14px">⚠️ จะแทนที่ข้อมูลทั้งหมด</p>
+    <input type="file" id="inp-backup" accept=".json" onchange="importData(this)" style="display:none">
+    <button class="btn btn-outline" onclick="document.getElementById('inp-backup').click()">📂 เลือกไฟล์ backup.json</button>
+  </div>
+  <div class="card"><div class="card-title"><span>🗑️</span>ล้างข้อมูล</div>
+    <p style="font-size:.85rem;color:var(--text2);margin-bottom:14px">ล้างข้อมูลทั้งหมด (ไม่สามารถกู้คืนได้)</p>
+    <button class="btn btn-danger" onclick="clearAllData()">ล้างข้อมูลทั้งหมด</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+// ===================== FIREBASE =====================
+const firebaseConfig = {
+  apiKey: "AIzaSyAqwe8VKTY653krwpUr62VayHmklkbFQiM",
+  authDomain: "baan-jao-noo.firebaseapp.com",
+  projectId: "baan-jao-noo",
+  storageBucket: "baan-jao-noo.firebasestorage.app",
+  messagingSenderId: "274963887630",
+  appId: "1:274963887630:web:fd150b9146cd98058d6e5f"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const DATA_DOC = db.collection('hamster').doc('mainData');
+
+let isSyncing = false;
+let firebaseReady = false;
+
+function updateSyncStatus(text, color){
+  const el=document.getElementById('sync-status');
+  if(el){el.textContent=text;el.style.color=color==='green'?'#4a9c6c':color==='orange'?'#e8a050':'#e05545';}
+}
+
+async function saveToFirebase(){
+  if(!firebaseReady)return;
+  try{
+    const data={
+      orders:S.orders||[],freshPurchases:S.freshPurchases||[],
+      dryLots:S.dryLots||[],boxLots:S.boxLots||[],
+      stock:S.stock||{},settings:S.settings||{},
+      manualSales:S.manualSales||[],dryAdjustments:S.dryAdjustments||[],
+      pendingRemnants:S.pendingRemnants||{},deliveryRounds:S.deliveryRounds||[],
+      updatedAt:new Date().toISOString()
+    };
+    await DATA_DOC.set(data);
+    updateSyncStatus('✅ Synced','green');
+  }catch(err){
+    console.error('Firebase save error:',err);
+    updateSyncStatus('⚠️ Offline','orange');
+  }
+}
+
+function startFirebaseSync(){
+  updateSyncStatus('🔄 Connecting...','orange');
+  DATA_DOC.onSnapshot(snap=>{
+    firebaseReady=true;
+    if(!snap.exists)return;
+    const data=snap.data();
+    if(!data)return;
+    const remoteTime=data.updatedAt?new Date(data.updatedAt):new Date(0);
+    const localTime=S._updatedAt?new Date(S._updatedAt):new Date(0);
+    if(remoteTime>localTime){
+      isSyncing=true;
+      const theme=localStorage.getItem('hamsterTheme');
+      S={...data};
+      delete S.updatedAt;
+      S._updatedAt=data.updatedAt;
+      if(theme)localStorage.setItem('hamsterTheme',theme);
+      fixAndRecalc();
+      localStorage.setItem('hamsterSnackV3',JSON.stringify(S));
+      renderAll();
+      setTimeout(()=>{isSyncing=false;},500);
+    }
+    updateSyncStatus('✅ Synced','green');
+  },err=>{
+    console.error('Firebase listen error:',err);
+    updateSyncStatus('⚠️ Offline','orange');
+  });
+}
+
+function renderAll(){
+  renderFreshList();renderFreshStockGrid();
+  renderDryStock();renderDryLots();
+  renderBoxStock();renderBoxLots();
+  renderOverview();
+  if(document.getElementById('manual-tbody'))renderManualList();
+  if(document.getElementById('dr-tbody'))renderDeliveryRounds();
+}
+const BACKUP_ORDERS=[{"id":"583562138744292370","date":"16/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51},{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27}],"totalQty":3,"hasCorn6":false,"revenue":100.8,"productCost":42.02,"packCost":2.35,"tiktokFee":12.88,"totalCost":57.25,"profit":43.55},{"id":"583575907977626896","date":"17/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"บวบ อบแห้ง","name":"บวบ","qty":1,"costPerBag":8.8},{"variation":"ค่าเริ่มต้น","name":"ข้าวโพด 6 แว่น","qty":1,"costPerBag":11.99},{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02}],"totalQty":4,"hasCorn6":true,"revenue":146.18,"productCost":50.05,"packCost":2.95,"tiktokFee":29.22,"totalCost":82.22,"profit":63.96},{"id":"583576213128906004","date":"17/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ฟักทอง อบแห้ง","name":"ฟักทอง","qty":1,"costPerBag":5.69},{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02},{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51}],"totalQty":3,"hasCorn6":false,"revenue":100.8,"productCost":23.22,"packCost":2.35,"tiktokFee":19.35,"totalCost":44.92,"profit":55.88},{"id":"583576624824026146","date":"17/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02}],"totalQty":1,"hasCorn6":false,"revenue":35,"productCost":11.02,"packCost":1.3,"tiktokFee":7.41,"totalCost":19.73,"profit":15.27},{"id":"583585561631163521","date":"18/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":2,"costPerBag":6.51}],"totalQty":2,"hasCorn6":false,"revenue":70,"productCost":13.02,"packCost":1.3,"tiktokFee":13.75,"totalCost":28.07,"profit":41.93},{"id":"583585596160771201","date":"18/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ค่าเริ่มต้น","name":"ข้าวโพด 6 แว่น","qty":1,"costPerBag":11.99}],"totalQty":1,"hasCorn6":true,"revenue":55,"productCost":11.99,"packCost":2.95,"tiktokFee":11.04,"totalCost":25.98,"profit":29.02},{"id":"583589203904267426","date":"18/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":6,"costPerBag":17.27}],"totalQty":6,"hasCorn6":false,"revenue":201.6,"productCost":103.62,"packCost":2.95,"tiktokFee":37.62,"totalCost":144.19,"profit":57.41},{"id":"583589678301808586","date":"18/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02},{"variation":"แครอท อบแห้ง","name":"แครอท","qty":1,"costPerBag":5.35}],"totalQty":2,"hasCorn6":false,"revenue":70,"productCost":16.37,"packCost":1.3,"tiktokFee":13.05,"totalCost":30.72,"profit":39.28},{"id":"583591722713712098","date":"18/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02}],"totalQty":2,"hasCorn6":false,"revenue":70,"productCost":29.26,"packCost":1.3,"tiktokFee":13.75,"totalCost":44.31,"profit":25.69},{"id":"583592041453028898","date":"18/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ฟักทอง อบแห้ง","name":"ฟักทอง","qty":1,"costPerBag":5.69},{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27},{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51},{"variation":"บวบ อบแห้ง","name":"บวบ","qty":2,"costPerBag":8.8}],"totalQty":6,"hasCorn6":false,"revenue":197.45,"productCost":58.09,"packCost":2.95,"tiktokFee":37.56,"totalCost":98.6,"profit":98.85},{"id":"583601108609172799","date":"19/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51}],"totalQty":1,"hasCorn6":false,"revenue":35,"productCost":6.51,"packCost":1.3,"tiktokFee":7.41,"totalCost":15.22,"profit":19.78},{"id":"583601319600752210","date":"19/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ฟักทอง อบแห้ง","name":"ฟักทอง","qty":1,"costPerBag":5.69},{"variation":"แครอท อบแห้ง","name":"แครอท","qty":1,"costPerBag":5.35},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27}],"totalQty":3,"hasCorn6":false,"revenue":100.8,"productCost":28.31,"packCost":2.35,"tiktokFee":19.35,"totalCost":50.01,"profit":50.79},{"id":"583622322669389051","date":"21/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ค่าเริ่มต้น","name":"ข้าวโพด 6 แว่น","qty":1,"costPerBag":11.99},{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02}],"totalQty":2,"hasCorn6":true,"revenue":90,"productCost":23.01,"packCost":2.95,"tiktokFee":17.38,"totalCost":43.34,"profit":46.66},{"id":"583635330768996003","date":"21/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":2,"costPerBag":18.24},{"variation":"ฟักทอง อบแห้ง","name":"ฟักทอง","qty":1,"costPerBag":5.69},{"variation":"บวบ อบแห้ง","name":"บวบ","qty":1,"costPerBag":8.8}],"totalQty":4,"hasCorn6":false,"revenue":134.4,"productCost":50.97,"packCost":2.35,"tiktokFee":25.44,"totalCost":78.76,"profit":55.64},{"id":"583636019705447441","date":"21/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":2,"costPerBag":18.24},{"variation":"ค่าเริ่มต้น","name":"ข้าวโพด 6 แว่น","qty":1,"costPerBag":11.99}],"totalQty":3,"hasCorn6":true,"revenue":125,"productCost":48.47,"packCost":2.95,"tiktokFee":23.71,"totalCost":75.13,"profit":49.87},{"id":"583636118754133723","date":"21/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ค่าเริ่มต้น","name":"ข้าวโพด 6 แว่น","qty":1,"costPerBag":11.99},{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02}],"totalQty":3,"hasCorn6":true,"revenue":125,"productCost":41.25,"packCost":2.95,"tiktokFee":23.71,"totalCost":67.91,"profit":57.09},{"id":"583636160166135316","date":"21/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51}],"totalQty":1,"hasCorn6":false,"revenue":35,"productCost":6.51,"packCost":1.3,"tiktokFee":7.41,"totalCost":15.22,"profit":19.78},{"id":"583636212321190929","date":"21/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ค่าเริ่มต้น","name":"ข้าวโพด 6 แว่น","qty":1,"costPerBag":11.99}],"totalQty":1,"hasCorn6":true,"revenue":55,"productCost":11.99,"packCost":2.95,"tiktokFee":11.04,"totalCost":25.98,"profit":29.02},{"id":"583636223334646854","date":"21/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ค่าเริ่มต้น","name":"ข้าวโพด 6 แว่น","qty":1,"costPerBag":11.99}],"totalQty":1,"hasCorn6":true,"revenue":55,"productCost":11.99,"packCost":2.95,"tiktokFee":11.04,"totalCost":25.98,"profit":29.02},{"id":"583651529293071728","date":"22/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51},{"variation":"บวบ อบแห้ง","name":"บวบ","qty":1,"costPerBag":8.8},{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24}],"totalQty":3,"hasCorn6":false,"revenue":100.8,"productCost":33.55,"packCost":2.35,"tiktokFee":19.35,"totalCost":55.25,"profit":45.55},{"id":"583666369367607270","date":"23/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"บวบ อบแห้ง","name":"บวบ","qty":1,"costPerBag":8.8},{"variation":"ค่าเริ่มต้น","name":"ข้าวโพด 6 แว่น","qty":1,"costPerBag":11.99},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27}],"totalQty":3,"hasCorn6":true,"revenue":125,"productCost":38.06,"packCost":2.95,"tiktokFee":23.71,"totalCost":64.72,"profit":60.28},{"id":"583682118301418857","date":"24/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02}],"totalQty":1,"hasCorn6":false,"revenue":33.99,"productCost":11.02,"packCost":1.3,"tiktokFee":8.52,"totalCost":20.84,"profit":13.15},{"id":"583682422280652695","date":"24/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51},{"variation":"บวบ อบแห้ง","name":"บวบ","qty":1,"costPerBag":8.8},{"variation":"ฟักทอง อบแห้ง","name":"ฟักทอง","qty":1,"costPerBag":5.69}],"totalQty":3,"hasCorn6":false,"revenue":97.89,"productCost":21,"packCost":2.35,"tiktokFee":22.58,"totalCost":45.93,"profit":51.96},{"id":"583686407610598816","date":"25/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24}],"totalQty":1,"hasCorn6":false,"revenue":34.99,"productCost":18.24,"packCost":1.3,"tiktokFee":8.35,"totalCost":27.89,"profit":7.1},{"id":"583696240551560209","date":"25/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02},{"variation":"บวบ อบแห้ง","name":"บวบ","qty":1,"costPerBag":8.8},{"variation":"กล้วย อบแห้ง","name":"กล้วย","qty":1,"costPerBag":8.35}],"totalQty":3,"hasCorn6":false,"revenue":100.77,"productCost":28.17,"packCost":2.35,"tiktokFee":22.57,"totalCost":53.09,"profit":47.68},{"id":"583718806685714078","date":"27/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ค่าเริ่มต้น","name":"ข้าวโพด 6 แว่น","qty":1,"costPerBag":11.99},{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02},{"variation":"แครอท อบแห้ง","name":"แครอท","qty":1,"costPerBag":5.35},{"variation":"กล้วย อบแห้ง","name":"กล้วย","qty":1,"costPerBag":8.35}],"totalQty":5,"hasCorn6":true,"revenue":189.36,"productCost":54.95,"packCost":2.95,"tiktokFee":39.71,"totalCost":97.61,"profit":91.75},{"id":"583746091191796898","date":"28/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02},{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51}],"totalQty":3,"hasCorn6":false,"revenue":100.77,"productCost":35.77,"packCost":2.35,"tiktokFee":22.57,"totalCost":60.69,"profit":40.08},{"id":"583746126694876841","date":"28/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27},{"variation":"กล้วย อบแห้ง","name":"กล้วย","qty":1,"costPerBag":8.35}],"totalQty":4,"hasCorn6":false,"revenue":134.36,"productCost":54.88,"packCost":2.35,"tiktokFee":29.74,"totalCost":86.97,"profit":47.39},{"id":"583748603282490789","date":"29/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51}],"totalQty":1,"hasCorn6":false,"revenue":34.99,"productCost":6.51,"packCost":1.3,"tiktokFee":8.18,"totalCost":15.99,"profit":19},{"id":"583760430354433186","date":"29/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":7,"costPerBag":17.27}],"totalQty":7,"hasCorn6":false,"revenue":215.2,"productCost":120.89,"packCost":2.95,"tiktokFee":43.51,"totalCost":167.35,"profit":47.85},{"id":"583765420936562149","date":"29/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"แครอท อบแห้ง","name":"แครอท","qty":1,"costPerBag":5.35},{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51},{"variation":"บวบ อบแห้ง","name":"บวบ","qty":1,"costPerBag":8.8},{"variation":"กล้วย อบแห้ง","name":"กล้วย","qty":1,"costPerBag":8.35},{"variation":"ฟักทอง อบแห้ง","name":"ฟักทอง","qty":1,"costPerBag":5.69}],"totalQty":5,"hasCorn6":false,"revenue":167.95,"productCost":34.7,"packCost":2.95,"tiktokFee":36.91,"totalCost":74.56,"profit":93.39},{"id":"583765811817121387","date":"29/04/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27}],"totalQty":1,"hasCorn6":false,"revenue":34.99,"productCost":17.27,"packCost":1.3,"tiktokFee":8.53,"totalCost":27.1,"profit":7.89},{"id":"583817195639899755","date":"02/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02}],"totalQty":1,"hasCorn6":false,"revenue":33.99,"productCost":11.02,"packCost":1.3,"tiktokFee":7.08,"totalCost":19.4,"profit":14.59},{"id":"583817809458005861","date":"02/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"บวบ อบแห้ง","name":"บวบ","qty":1,"costPerBag":8.8},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27},{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51}],"totalQty":3,"hasCorn6":false,"revenue":97.89,"productCost":32.58,"packCost":2.35,"tiktokFee":20.43,"totalCost":55.36,"profit":42.53},{"id":"583818244434134093","date":"02/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"บวบ อบแห้ง","name":"บวบ","qty":1,"costPerBag":8.8},{"variation":"กล้วย อบแห้ง","name":"กล้วย","qty":1,"costPerBag":8.35},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27},{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51}],"totalQty":4,"hasCorn6":false,"revenue":130.52,"productCost":40.93,"packCost":2.35,"tiktokFee":27.24,"totalCost":70.52,"profit":60},{"id":"583823786757425149","date":"02/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02}],"totalQty":1,"hasCorn6":false,"revenue":33.99,"productCost":11.02,"packCost":1.3,"tiktokFee":7.08,"totalCost":19.4,"profit":14.59},{"id":"583823876251878904","date":"02/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51},{"variation":"กล้วย อบแห้ง","name":"กล้วย","qty":1,"costPerBag":8.35},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27}],"totalQty":3,"hasCorn6":false,"revenue":97.89,"productCost":32.13,"packCost":2.35,"tiktokFee":20.43,"totalCost":54.91,"profit":42.98},{"id":"583824574085957561","date":"02/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":2,"costPerBag":17.27},{"variation":"กล้วย อบแห้ง","name":"กล้วย","qty":1,"costPerBag":8.35}],"totalQty":3,"hasCorn6":false,"revenue":97.89,"productCost":42.89,"packCost":2.35,"tiktokFee":21.36,"totalCost":66.6,"profit":31.29},{"id":"583824707551725195","date":"02/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27},{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51}],"totalQty":3,"hasCorn6":false,"revenue":97.89,"productCost":42.02,"packCost":2.35,"tiktokFee":20.43,"totalCost":64.8,"profit":33.09},{"id":"583824810218783957","date":"02/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ค่าเริ่มต้น","name":"ข้าวโพด 6 แว่น","qty":1,"costPerBag":11.99},{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02},{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51}],"totalQty":4,"hasCorn6":true,"revenue":152.89,"productCost":47.76,"packCost":2.95,"tiktokFee":29.8,"totalCost":80.51,"profit":72.38},{"id":"583825316942546261","date":"03/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27},{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51},{"variation":"ฟักทอง อบแห้ง","name":"ฟักทอง","qty":1,"costPerBag":5.69},{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02}],"totalQty":4,"hasCorn6":false,"revenue":134.36,"productCost":40.49,"packCost":2.35,"tiktokFee":27.24,"totalCost":70.08,"profit":64.28},{"id":"583836743039485431","date":"03/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27},{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51}],"totalQty":2,"hasCorn6":false,"revenue":65.08,"productCost":23.78,"packCost":1.3,"tiktokFee":14.14,"totalCost":39.22,"profit":25.86},{"id":"583838031306261651","date":"03/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ค่าเริ่มต้น","name":"ข้าวโพด 6 แว่น","qty":1,"costPerBag":11.99}],"totalQty":1,"hasCorn6":true,"revenue":55,"productCost":11.99,"packCost":2.95,"tiktokFee":9.38,"totalCost":24.32,"profit":30.68},{"id":"583838247587251754","date":"03/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02}],"totalQty":1,"hasCorn6":false,"revenue":34.99,"productCost":11.02,"packCost":1.3,"tiktokFee":7.09,"totalCost":19.41,"profit":15.58},{"id":"583840952880170921","date":"03/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51},{"variation":"บวบ อบแห้ง","name":"บวบ","qty":1,"costPerBag":8.8}],"totalQty":3,"hasCorn6":false,"revenue":100.77,"productCost":33.55,"packCost":2.35,"tiktokFee":22.43,"totalCost":58.33,"profit":42.44},{"id":"583841055717557504","date":"03/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27},{"variation":"กล้วย อบแห้ง","name":"กล้วย","qty":1,"costPerBag":8.35},{"variation":"แครอท อบแห้ง","name":"แครอท","qty":1,"costPerBag":5.35}],"totalQty":3,"hasCorn6":false,"revenue":100.77,"productCost":30.97,"packCost":2.35,"tiktokFee":20.42,"totalCost":53.74,"profit":47.03},{"id":"583841375110464927","date":"03/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02},{"variation":"กล้วย อบแห้ง","name":"กล้วย","qty":1,"costPerBag":8.35},{"variation":"ค่าเริ่มต้น","name":"ข้าวโพด 6 แว่น","qty":1,"costPerBag":11.99},{"variation":"ฟักทอง อบแห้ง","name":"ฟักทอง","qty":1,"costPerBag":5.69}],"totalQty":4,"hasCorn6":true,"revenue":155.77,"productCost":37.05,"packCost":2.95,"tiktokFee":29.8,"totalCost":69.8,"profit":85.97},{"id":"583841508048012869","date":"03/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27}],"totalQty":2,"hasCorn6":false,"revenue":69.98,"productCost":28.29,"packCost":1.3,"tiktokFee":14.18,"totalCost":43.77,"profit":26.21},{"id":"583858035069650292","date":"04/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"บวบ อบแห้ง","name":"บวบ","qty":1,"costPerBag":8.8},{"variation":"กล้วย อบแห้ง","name":"กล้วย","qty":1,"costPerBag":8.35},{"variation":"ฟักทอง อบแห้ง","name":"ฟักทอง","qty":1,"costPerBag":5.69},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27},{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51}],"totalQty":5,"hasCorn6":false,"revenue":167.95,"productCost":46.62,"packCost":2.95,"tiktokFee":34.04,"totalCost":83.61,"profit":84.34},{"id":"583858047500322073","date":"04/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"แครอท อบแห้ง","name":"แครอท","qty":1,"costPerBag":5.35},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27},{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51}],"totalQty":4,"hasCorn6":false,"revenue":134.36,"productCost":47.37,"packCost":2.35,"tiktokFee":27.24,"totalCost":76.96,"profit":57.4},{"id":"583860103172490469","date":"04/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02},{"variation":"บวบ อบแห้ง","name":"บวบ","qty":1,"costPerBag":8.8},{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24}],"totalQty":3,"hasCorn6":false,"revenue":100.77,"productCost":38.06,"packCost":2.35,"tiktokFee":20.42,"totalCost":60.83,"profit":39.94},{"id":"583861989245552507","date":"05/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"กล้วย อบแห้ง","name":"กล้วย","qty":1,"costPerBag":8.35},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27},{"variation":"บวบ อบแห้ง","name":"บวบ","qty":1,"costPerBag":8.8},{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02},{"variation":"แครอท อบแห้ง","name":"แครอท","qty":1,"costPerBag":5.35},{"variation":"ฟักทอง อบแห้ง","name":"ฟักทอง","qty":1,"costPerBag":5.69},{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51},{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24}],"totalQty":8,"hasCorn6":false,"revenue":255.28,"productCost":81.23,"packCost":2.95,"tiktokFee":54.32,"totalCost":138.5,"profit":116.78},{"id":"583875394865432042","date":"05/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"กล้วย อบแห้ง","name":"กล้วย","qty":1,"costPerBag":8.35},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27},{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51}],"totalQty":3,"hasCorn6":false,"revenue":100.77,"productCost":32.13,"packCost":2.35,"tiktokFee":20.42,"totalCost":54.9,"profit":45.87},{"id":"583875734127085082","date":"05/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27},{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51}],"totalQty":3,"hasCorn6":false,"revenue":100.77,"productCost":42.02,"packCost":2.35,"tiktokFee":20.42,"totalCost":64.79,"profit":35.98},{"id":"583876440455545927","date":"05/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"บวบ อบแห้ง","name":"บวบ","qty":1,"costPerBag":8.8},{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"แครอท อบแห้ง","name":"แครอท","qty":1,"costPerBag":5.35}],"totalQty":3,"hasCorn6":false,"revenue":100.77,"productCost":32.39,"packCost":2.35,"tiktokFee":20.42,"totalCost":55.16,"profit":45.61},{"id":"583879523237791138","date":"05/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51}],"totalQty":1,"hasCorn6":false,"revenue":34.99,"productCost":6.51,"packCost":1.3,"tiktokFee":7.09,"totalCost":14.9,"profit":20.09},{"id":"583879643121485714","date":"05/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":2,"costPerBag":6.51}],"totalQty":2,"hasCorn6":false,"revenue":45.13,"productCost":13.02,"packCost":1.3,"tiktokFee":13.94,"totalCost":28.26,"profit":16.87},{"id":"583886423785637093","date":"06/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ฟักทอง อบแห้ง","name":"ฟักทอง","qty":1,"costPerBag":5.69},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27},{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51}],"totalQty":3,"hasCorn6":false,"revenue":100.77,"productCost":29.47,"packCost":2.35,"tiktokFee":21.5,"totalCost":53.32,"profit":47.45},{"id":"583905574836733751","date":"07/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ค่าเริ่มต้น","name":"ข้าวโพด 6 แว่น","qty":1,"costPerBag":11.99}],"totalQty":1,"hasCorn6":true,"revenue":55.0,"productCost":11.99,"packCost":2.95,"tiktokFee":9.97,"totalCost":24.91,"profit":30.09},{"id":"583920295860995843","date":"08/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"กล้วย อบแห้ง","name":"กล้วย","qty":1,"costPerBag":8.35},{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27}],"totalQty":3,"hasCorn6":false,"revenue":97.89,"productCost":43.86,"packCost":2.35,"tiktokFee":21.51,"totalCost":67.72,"profit":30.17},{"id":"583939473422714050","date":"09/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51}],"totalQty":1,"hasCorn6":false,"revenue":33.99,"productCost":6.51,"packCost":1.3,"tiktokFee":7.45,"totalCost":15.26,"profit":18.73},{"id":"583942710347204119","date":"09/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ค่าเริ่มต้น","name":"ข้าวโพด 6 แว่น","qty":1,"costPerBag":11.99},{"variation":"กล้วย อบแห้ง","name":"กล้วย","qty":1,"costPerBag":8.35}],"totalQty":2,"hasCorn6":true,"revenue":88.99,"productCost":20.34,"packCost":2.95,"tiktokFee":17.42,"totalCost":40.71,"profit":48.28},{"id":"583948491943609538","date":"09/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02}],"totalQty":1,"hasCorn6":false,"revenue":34.99,"productCost":11.02,"packCost":1.3,"tiktokFee":8.38,"totalCost":20.7,"profit":14.29},{"id":"583948823701391026","date":"09/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"ฟักทอง อบแห้ง","name":"ฟักทอง","qty":1,"costPerBag":5.69}],"totalQty":1,"hasCorn6":false,"revenue":35.0,"productCost":5.69,"packCost":1.3,"tiktokFee":6.34,"totalCost":13.33,"profit":21.67},{"id":"583949583496742086","date":"09/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02},{"variation":"กล้วย อบแห้ง","name":"กล้วย","qty":1,"costPerBag":8.35},{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24}],"totalQty":3,"hasCorn6":false,"revenue":100.89,"productCost":37.61,"packCost":2.35,"tiktokFee":21.51,"totalCost":61.47,"profit":39.42},{"id":"583950560704496958","date":"10/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27},{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51}],"totalQty":2,"hasCorn6":false,"revenue":69.98,"productCost":23.78,"packCost":1.3,"tiktokFee":14.23,"totalCost":39.31,"profit":30.67},{"id":"583956490432513111","date":"10/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27}],"totalQty":2,"hasCorn6":false,"revenue":69.98,"productCost":35.51,"packCost":1.3,"tiktokFee":14.91,"totalCost":51.72,"profit":18.26},{"id":"583962928818979875","date":"10/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51},{"variation":"กล้วย อบแห้ง","name":"กล้วย","qty":1,"costPerBag":8.35},{"variation":"ฟักทอง อบแห้ง","name":"ฟักทอง","qty":1,"costPerBag":5.69}],"totalQty":3,"hasCorn6":false,"revenue":97.89,"productCost":20.55,"packCost":2.35,"tiktokFee":0,"totalCost":22.9,"profit":74.99},{"id":"583963278356612290","date":"10/05/2026","status":"เสร็จสมบูรณ์","items":[{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27},{"variation":"กล้วย อบแห้ง","name":"กล้วย","qty":1,"costPerBag":8.35}],"totalQty":3,"hasCorn6":false,"revenue":100.89,"productCost":43.86,"packCost":2.35,"tiktokFee":21.8,"totalCost":68.01,"profit":32.88},{"id":"583964452319692355","date":"10/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"แครอท อบแห้ง","name":"แครอท","qty":1,"costPerBag":5.35},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27},{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51}],"totalQty":3,"hasCorn6":false,"revenue":97.89,"productCost":29.13,"packCost":2.35,"tiktokFee":0,"totalCost":31.48,"profit":66.41},{"id":"583980285208593534","date":"11/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51},{"variation":"บวบ อบแห้ง","name":"บวบ","qty":1,"costPerBag":8.8},{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02}],"totalQty":3,"hasCorn6":false,"revenue":100.77,"productCost":26.33,"packCost":2.35,"tiktokFee":0,"totalCost":28.68,"profit":72.09},{"id":"583980720060401636","date":"11/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27}],"totalQty":1,"hasCorn6":false,"revenue":34.99,"productCost":17.27,"packCost":1.3,"tiktokFee":0,"totalCost":18.57,"profit":16.42},{"id":"583987897844467009","date":"12/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27},{"variation":"บวบ อบแห้ง","name":"บวบ","qty":1,"costPerBag":8.8}],"totalQty":2,"hasCorn6":false,"revenue":69.98,"productCost":26.07,"packCost":1.3,"tiktokFee":0,"totalCost":27.37,"profit":42.61},{"id":"583990818761639640","date":"12/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"ฟักทอง อบแห้ง","name":"ฟักทอง","qty":1,"costPerBag":5.69},{"variation":"บวบ อบแห้ง","name":"บวบ","qty":1,"costPerBag":8.8}],"totalQty":3,"hasCorn6":false,"revenue":100.37,"productCost":32.73,"packCost":2.35,"tiktokFee":0,"totalCost":35.08,"profit":65.29},{"id":"583991828734641922","date":"12/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24}],"totalQty":1,"hasCorn6":false,"revenue":34.99,"productCost":18.24,"packCost":1.3,"tiktokFee":0,"totalCost":19.54,"profit":15.45},{"id":"583995704267539892","date":"12/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"ค่าเริ่มต้น","name":"ข้าวโพด 6 แว่น","qty":1,"costPerBag":11.99}],"totalQty":1,"hasCorn6":true,"revenue":55,"productCost":11.99,"packCost":2.95,"tiktokFee":0,"totalCost":14.94,"profit":40.06},{"id":"583995809437353154","date":"12/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"แครอท อบแห้ง","name":"แครอท","qty":1,"costPerBag":5.35}],"totalQty":1,"hasCorn6":false,"revenue":34.99,"productCost":5.35,"packCost":1.3,"tiktokFee":0,"totalCost":6.65,"profit":28.34},{"id":"583995996788393426","date":"12/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51}],"totalQty":1,"hasCorn6":false,"revenue":32.19,"productCost":6.51,"packCost":1.3,"tiktokFee":0,"totalCost":7.81,"profit":24.38},{"id":"583996150280783466","date":"12/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"ค่าเริ่มต้น","name":"ข้าวโพด 6 แว่น","qty":1,"costPerBag":11.99}],"totalQty":1,"hasCorn6":true,"revenue":55,"productCost":11.99,"packCost":2.95,"tiktokFee":0,"totalCost":14.94,"profit":40.06},{"id":"583996574146921770","date":"12/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02},{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51}],"totalQty":3,"hasCorn6":false,"revenue":100.77,"productCost":35.77,"packCost":2.35,"tiktokFee":0,"totalCost":38.12,"profit":62.65},{"id":"583996669643818233","date":"12/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27}],"totalQty":1,"hasCorn6":false,"revenue":34.99,"productCost":17.27,"packCost":1.3,"tiktokFee":0,"totalCost":18.57,"profit":16.42},{"id":"583998316602492064","date":"13/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"ค่าเริ่มต้น","name":"ข้าวโพด 6 แว่น","qty":1,"costPerBag":11.99},{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02},{"variation":"แครอท อบแห้ง","name":"แครอท","qty":1,"costPerBag":5.35},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27}],"totalQty":4,"hasCorn6":true,"revenue":140.19,"productCost":45.63,"packCost":2.95,"tiktokFee":0,"totalCost":48.58,"profit":91.61},{"id":"584007330077181332","date":"13/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":2,"costPerBag":18.24}],"totalQty":2,"hasCorn6":false,"revenue":69.98,"productCost":36.48,"packCost":1.3,"tiktokFee":0,"totalCost":37.78,"profit":32.2},{"id":"584011333706810414","date":"13/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51}],"totalQty":1,"hasCorn6":false,"revenue":34.99,"productCost":6.51,"packCost":1.3,"tiktokFee":0,"totalCost":7.81,"profit":27.18},{"id":"584011515792164334","date":"13/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"แครอท อบแห้ง","name":"แครอท","qty":1,"costPerBag":5.35},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27}],"totalQty":3,"hasCorn6":false,"revenue":100.77,"productCost":40.86,"packCost":2.35,"tiktokFee":0,"totalCost":43.21,"profit":57.56},{"id":"584023959977166773","date":"14/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02},{"variation":"แครอท อบแห้ง","name":"แครอท","qty":1,"costPerBag":5.35}],"totalQty":3,"hasCorn6":false,"revenue":100.77,"productCost":34.61,"packCost":2.35,"tiktokFee":0,"totalCost":36.96,"profit":63.81},{"id":"584026148944512205","date":"14/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02}],"totalQty":1,"hasCorn6":false,"revenue":34.99,"productCost":11.02,"packCost":1.3,"tiktokFee":0,"totalCost":12.32,"profit":22.67},{"id":"584026888951662473","date":"14/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"กล้วย อบแห้ง","name":"กล้วย","qty":1,"costPerBag":8.35}],"totalQty":1,"hasCorn6":false,"revenue":34.99,"productCost":8.35,"packCost":1.3,"tiktokFee":0,"totalCost":9.65,"profit":25.34},{"id":"584040223789843929","date":"15/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51}],"totalQty":1,"hasCorn6":false,"revenue":34.99,"productCost":6.51,"packCost":1.3,"tiktokFee":0,"totalCost":7.81,"profit":27.18},{"id":"584040374769124979","date":"15/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"ค่าเริ่มต้น","name":"ข้าวโพด 6 แว่น","qty":1,"costPerBag":11.99}],"totalQty":1,"hasCorn6":true,"revenue":55,"productCost":11.99,"packCost":2.95,"tiktokFee":0,"totalCost":14.94,"profit":40.06},{"id":"584040381698246472","date":"15/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51},{"variation":"บวบ อบแห้ง","name":"บวบ","qty":1,"costPerBag":8.8},{"variation":"กล้วย อบแห้ง","name":"กล้วย","qty":1,"costPerBag":8.35}],"totalQty":3,"hasCorn6":false,"revenue":100.67,"productCost":23.66,"packCost":2.35,"tiktokFee":0,"totalCost":26.01,"profit":74.66},{"id":"584040417794557555","date":"15/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"แครอท อบแห้ง","name":"แครอท","qty":1,"costPerBag":5.35}],"totalQty":1,"hasCorn6":false,"revenue":35,"productCost":5.35,"packCost":1.3,"tiktokFee":0,"totalCost":6.65,"profit":28.35},{"id":"584040460642387571","date":"15/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24}],"totalQty":1,"hasCorn6":false,"revenue":35,"productCost":18.24,"packCost":1.3,"tiktokFee":0,"totalCost":19.54,"profit":15.46},{"id":"584044033227261316","date":"15/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"บวบ อบแห้ง","name":"บวบ","qty":1,"costPerBag":8.8}],"totalQty":1,"hasCorn6":false,"revenue":32.19,"productCost":8.8,"packCost":1.3,"tiktokFee":0,"totalCost":10.1,"profit":22.09},{"id":"584044182157100281","date":"15/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24}],"totalQty":1,"hasCorn6":false,"revenue":34.99,"productCost":18.24,"packCost":1.3,"tiktokFee":0,"totalCost":19.54,"profit":15.45},{"id":"584044429717177538","date":"15/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"ค่าเริ่มต้น","name":"ข้าวโพด 6 แว่น","qty":1,"costPerBag":11.99}],"totalQty":1,"hasCorn6":true,"revenue":55,"productCost":11.99,"packCost":2.95,"tiktokFee":0,"totalCost":14.94,"profit":40.06},{"id":"584044451406513336","date":"16/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"กล้วย อบแห้ง","name":"กล้วย","qty":1,"costPerBag":8.35},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":2,"costPerBag":17.27}],"totalQty":3,"hasCorn6":false,"revenue":100.77,"productCost":42.89,"packCost":2.35,"tiktokFee":0,"totalCost":45.24,"profit":55.53},{"id":"584044638152263466","date":"16/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"กล้วย อบแห้ง","name":"กล้วย","qty":1,"costPerBag":8.35},{"variation":"ฟักทอง อบแห้ง","name":"ฟักทอง","qty":1,"costPerBag":5.69},{"variation":"แครอท อบแห้ง","name":"แครอท","qty":1,"costPerBag":5.35}],"totalQty":3,"hasCorn6":false,"revenue":100.77,"productCost":19.39,"packCost":2.35,"tiktokFee":0,"totalCost":21.74,"profit":79.03},{"id":"584054417448862981","date":"16/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27},{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51}],"totalQty":3,"hasCorn6":false,"revenue":100.77,"productCost":42.02,"packCost":2.35,"tiktokFee":0,"totalCost":44.37,"profit":56.4},{"id":"584058902331885303","date":"16/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02},{"variation":"แครอท อบแห้ง","name":"แครอท","qty":1,"costPerBag":5.35},{"variation":"กล้วย อบแห้ง","name":"กล้วย","qty":1,"costPerBag":8.35},{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"ฟักทอง อบแห้ง","name":"ฟักทอง","qty":1,"costPerBag":5.69}],"totalQty":5,"hasCorn6":false,"revenue":167.95,"productCost":48.65,"packCost":2.95,"tiktokFee":0,"totalCost":51.6,"profit":116.35},{"id":"584067526618023866","date":"17/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51},{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"กล้วย อบแห้ง","name":"กล้วย","qty":1,"costPerBag":8.35},{"variation":"แครอท อบแห้ง","name":"แครอท","qty":1,"costPerBag":5.35},{"variation":"บวบ อบแห้ง","name":"บวบ","qty":1,"costPerBag":8.8},{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02},{"variation":"ฟักทอง อบแห้ง","name":"ฟักทอง","qty":1,"costPerBag":5.69},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27}],"totalQty":8,"hasCorn6":false,"revenue":268.72,"productCost":81.23,"packCost":2.95,"tiktokFee":0,"totalCost":84.18,"profit":184.54},{"id":"584075607420273914","date":"18/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":2,"costPerBag":17.27},{"variation":"ข้าวโพด อบแห้ง 3 แว่น","name":"ข้าวโพด 3 แว่น","qty":1,"costPerBag":6.51},{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"ฟักทอง อบแห้ง","name":"ฟักทอง","qty":1,"costPerBag":5.69},{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02}],"totalQty":6,"hasCorn6":false,"revenue":201.6,"productCost":76,"packCost":2.95,"tiktokFee":0,"totalCost":78.95,"profit":122.65},{"id":"584089988800022167","date":"18/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"ค่าเริ่มต้น","name":"ข้าวโพด 6 แว่น","qty":1,"costPerBag":17.12}],"totalQty":1,"hasCorn6":true,"revenue":35,"productCost":17.12,"packCost":2.95,"tiktokFee":0,"totalCost":20.07,"profit":14.93},{"id":"584089307605337369","date":"18/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"ค่าเริ่มต้น","name":"ข้าวโพด 6 แว่น","qty":1,"costPerBag":17.12},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27}],"totalQty":2,"hasCorn6":true,"revenue":70,"productCost":34.39,"packCost":2.95,"tiktokFee":0,"totalCost":37.34,"profit":32.66},{"id":"584089266987435012","date":"18/05/2026","status":"จัดส่งแล้ว","items":[{"variation":"ค่าเริ่มต้น","name":"ข้าวโพด 6 แว่น","qty":1,"costPerBag":17.12},{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":11.02}],"totalQty":2,"hasCorn6":true,"revenue":70,"productCost":28.14,"packCost":2.95,"tiktokFee":0,"totalCost":31.09,"profit":38.91},{"id":"584101902380533572","date":"19/05/2026","status":"ที่จะจัดส่ง","items":[{"variation":"บล็อคโคลี่ อบแห้ง","name":"บล็อคโคลี่","qty":1,"costPerBag":18.24},{"variation":"แตงกวา อบแห้ง","name":"แตงกวา","qty":1,"costPerBag":16.63},{"variation":"แอปเปิ้ล อบแห้ง","name":"แอปเปิ้ล","qty":1,"costPerBag":17.27}],"totalQty":3,"hasCorn6":false,"revenue":0,"productCost":52.14,"packCost":2.35,"tiktokFee":0,"totalCost":54.49,"profit":-54.49}];
+const BACKUP_FRESH=[{"id":1779171198143,"name":"แอปเปิ้ล","date":"2026-05-15","price":80,"qty":4,"unit":"ลูก","note":"","usedQty":0,"pricePerUnit":20},{"id":1779171323694,"name":"แตงกวา","date":"2026-05-15","price":60,"qty":8,"unit":"ลูก","note":"","usedQty":2,"pricePerUnit":7.5},{"id":1779199673475,"name":"ข้าวโพด","date":"2026-05-15","price":232,"qty":24,"unit":"ฝัก","note":"","usedQty":14,"pricePerUnit":9.67},{"id":1779206878305,"name":"บวบ","date":"2026-05-15","price":96.43,"qty":9,"unit":"ฝัก","note":"","usedQty":9,"pricePerUnit":10.71}];
+const BACKUP_DRYLOTS=[{"id":"lot-init","date":"18/05/2026","name":"(ต้นทุนตั้งต้น)","rawCost":0,"rawQty":"ข้อมูลตั้งต้น","hours":0,"totalBags":0,"soldBags":0,"costPerBag":0,"isInit":true},{"id":"lot-1779206203269-n89","groupId":"lotg-1779206203269","date":"2026-05-18","name":"ข้าวโพด 3 แว่น","freshDesc":"ข้าวโพด 14 ฝัก","rawCost":65.95,"elecCost":38.97,"bagCost":1.16,"rawQty":"ข้าวโพด 14 ฝัก","remnantGrams":0,"remnantCost":0,"remnantUsed":false,"totalBags":19,"soldBags":0,"costPerBag":6.68},{"id":"lot-1779206203269-kr3","groupId":"lotg-1779206203269","date":"2026-05-18","name":"ข้าวโพด 6 แว่น","freshDesc":"ข้าวโพด 14 ฝัก","rawCost":69.43,"elecCost":41.03,"bagCost":1.6,"rawQty":"ข้าวโพด 14 ฝัก","remnantGrams":0,"remnantCost":0,"remnantUsed":false,"totalBags":10,"soldBags":0,"costPerBag":12.65},{"id":"lot-1779206912522-amm","groupId":"lotg-1779206912522","date":"2026-05-17","name":"บวบ","freshDesc":"บวบ 5 ฝัก","rawCost":53.55,"elecCost":35,"bagCost":1.16,"rawQty":"บวบ 5 ฝัก","remnantGrams":0,"remnantCost":0,"remnantUsed":false,"totalBags":8,"soldBags":0,"costPerBag":12.23},{"id":"lot-1779207040991-zeq","groupId":"lotg-1779207040991","date":"2026-05-19","name":"บวบ","freshDesc":"บวบ 4 ฝัก, แตงกวา 2 ลูก","rawCost":48.2,"elecCost":29.17,"bagCost":1.16,"rawQty":"บวบ 4 ฝัก, แตงกวา 2 ลูก","remnantGrams":3,"remnantCost":4.38,"remnantUsed":false,"totalBags":5,"soldBags":0,"costPerBag":16.63},{"id":"lot-1779207040991-qxt","groupId":"lotg-1779207040991","date":"2026-05-19","name":"แตงกวา","freshDesc":"บวบ 4 ฝัก, แตงกวา 2 ลูก","rawCost":9.64,"elecCost":5.83,"bagCost":1.16,"rawQty":"บวบ 4 ฝัก, แตงกวา 2 ลูก","remnantGrams":7.65,"remnantCost":6.71,"remnantUsed":false,"totalBags":1,"soldBags":0,"costPerBag":16.63}];
+// ===================== CONSTANTS =====================
+const PRODUCT_ICONS={'ข้าวโพด 3 แว่น':'🌽','แครอท':'🥕','ฟักทอง':'🎃','แอปเปิ้ล':'🍎','แตงกวา':'🥒','บล็อคโคลี่':'🥦','บวบ':'🌿','กล้วย':'🍌','ส้มแมนดาริน':'🍊','ข้าวโพด 6 แว่น':'🌽'};
+const FRESH_ICONS={'ข้าวโพด':'🌽','แครอท':'🥕','ฟักทอง':'🎃','แอปเปิ้ล':'🍎','แตงกวา':'🥒','บล็อคโคลี่':'🥦','บวบ':'🌿','กล้วย':'🍌','ส้มแมนดาริน':'🍊'};
+const INITIAL_STOCK={'ข้าวโพด 3 แว่น':5,'แครอท':14,'ฟักทอง':16,'แอปเปิ้ล':12,'แตงกวา':9,'บล็อคโคลี่':5,'บวบ':14,'กล้วย':11,'ส้มแมนดาริน':0,'ข้าวโพด 6 แว่น':0};
+const INITIAL_COSTS={'ข้าวโพด 3 แว่น':6.51,'แครอท':5.35,'ฟักทอง':5.69,'แอปเปิ้ล':17.27,'แตงกวา':11.02,'บล็อคโคลี่':18.24,'บวบ':8.80,'กล้วย':8.35,'ส้มแมนดาริน':0,'ข้าวโพด 6 แว่น':11.99};
+const DEFAULT_SETTINGS={costs:INITIAL_COSTS,pack1:1.30,pack2:2.35,pack3:2.95,elec:5.0,bag1217:0.66,bag1220:0.84,bag1522:1.10,kanchuean:0.50,
+  fuel91:43.68,fuel95:44.05,motoKmpl:45.3,carKmpl:23.6,deliveryKm:4,carThreshold:14,deliveryStart:'2026-05-23',
+  sticker:0.181};
+const FRESH_TO_DRY={'ข้าวโพด':[{name:'ข้าวโพด 3 แว่น',slicesPerBag:3},{name:'ข้าวโพด 6 แว่น',slicesPerBag:6}],'แครอท':[{name:'แครอท'}],'ฟักทอง':[{name:'ฟักทอง'}],'แอปเปิ้ล':[{name:'แอปเปิ้ล'}],'แตงกวา':[{name:'แตงกวา'}],'บล็อคโคลี่':[{name:'บล็อคโคลี่'}],'บวบ':[{name:'บวบ'}],'กล้วย':[{name:'กล้วย'}],'ส้มแมนดาริน':[{name:'ส้มแมนดาริน'}]};
+const VAR_MAP={'ข้าวโพด อบแห้ง 3 แว่น':'ข้าวโพด 3 แว่น','แครอท อบแห้ง':'แครอท','ฟักทอง อบแห้ง':'ฟักทอง','แอปเปิ้ล อบแห้ง':'แอปเปิ้ล','แตงกวา อบแห้ง':'แตงกวา','บล็อคโคลี่ อบแห้ง':'บล็อคโคลี่','บวบ อบแห้ง':'บวบ','กล้วย อบแห้ง':'กล้วย','ค่าเริ่มต้น':'ข้าวโพด 6 แว่น'};
+
+// ===================== STATE =====================
+let S;
+function round2(n){return Math.round(n*100)/100;}
+
+function buildInitLots(){
+  return Object.entries(INITIAL_STOCK).filter(([,q])=>q>0).map(([name,qty])=>({
+    id:'lot-init-'+name.replace(/ /g,'_'),date:'2026-05-18',name,isInit:true,
+    rawCost:0,elecCost:0,bagCost:0,rawQty:'สต็อกตั้งต้น 18/05',
+    totalBags:qty,soldBags:0,costPerBag:INITIAL_COSTS[name]||0,
+    remnantGrams:0,remnantCost:0,remnantUsed:false
+  }));
+}
+
+function loadState(){
+  try{const r=localStorage.getItem('hamsterSnackV3');if(r){S=JSON.parse(r);fixAndRecalc();return;}}catch(e){}
+  S={orders:JSON.parse(JSON.stringify(BACKUP_ORDERS)),freshPurchases:JSON.parse(JSON.stringify(BACKUP_FRESH)),
+     dryLots:[...JSON.parse(JSON.stringify(BACKUP_DRYLOTS)),...buildInitLots()],
+     boxLots:JSON.parse(JSON.stringify(BOX_INITIAL_LOTS)),
+     stock:JSON.parse(JSON.stringify(INITIAL_STOCK)),settings:JSON.parse(JSON.stringify(DEFAULT_SETTINGS)),
+     manualSales:[],dryAdjustments:[],pendingRemnants:{},deliveryRounds:[]};
+  recalcAllFifo();saveState();
+}
+function saveState(){
+  S._updatedAt=new Date().toISOString();
+  localStorage.setItem('hamsterSnackV3',JSON.stringify(S));
+  if(!isSyncing)saveToFirebase();
+}
+
+function fixAndRecalc(){
+  if(!S.manualSales)S.manualSales=[];
+  if(!S.dryAdjustments)S.dryAdjustments=[];
+  if(!S.pendingRemnants)S.pendingRemnants={};
+  if(!S.deliveryRounds)S.deliveryRounds=[];
+  if(!S.boxLots)S.boxLots=JSON.parse(JSON.stringify(BOX_INITIAL_LOTS));
+  // ตรวจสอบและเพิ่ม init lots ถ้าหาย
+  Object.entries(INITIAL_STOCK).filter(([,q])=>q>0).forEach(([name,qty])=>{
+    let lot=S.dryLots.find(l=>l.id==='lot-init-'+name.replace(/ /g,'_'));
+    if(!lot){S.dryLots.push({id:'lot-init-'+name.replace(/ /g,'_'),date:'2026-05-18',name,isInit:true,rawCost:0,elecCost:0,bagCost:0,rawQty:'สต็อกตั้งต้น 18/05',totalBags:qty,soldBags:0,costPerBag:INITIAL_COSTS[name]||0,remnantGrams:0,remnantCost:0,remnantUsed:false});lot=S.dryLots[S.dryLots.length-1];}
+    lot.totalBags=qty;lot.costPerBag=INITIAL_COSTS[name]||0;
+  });
+  if(!S.settings.sticker)S.settings.sticker=0.181;
+  recalcAllFifo();
+}
+
+// ===================== FIFO =====================
+function parseDate(d){
+  if(!d)return new Date(0);
+  if(d.includes('/'))return new Date(d.split('/').reverse().join('-'));
+  return new Date(d);
+}
+
+function lotSort(a,b){
+  const da=parseDate(a.date),db=parseDate(b.date);
+  if(da.getTime()!==db.getTime())return da-db;
+  if(a.isInit&&!b.isInit)return -1;
+  if(!a.isInit&&b.isInit)return 1;
+  return 0;
+}
+
+function recalcAllFifo(){
+  const names=[...new Set(S.dryLots.map(l=>l.name).filter(n=>n!=='(ต้นทุนตั้งต้น)'))];
+  names.forEach(name=>{
+    const lots=S.dryLots.filter(l=>l.name===name).sort(lotSort);
+    lots.forEach(l=>{l.soldBags=0;});
+
+    // ออเดอร์ขาย (TikTok + manual)
+    const orders=[...S.orders,...(S.manualSales||[])]
+      .filter(o=>['เสร็จสมบูรณ์','จัดส่งแล้ว','ที่จะจัดส่ง'].includes(o.status)&&o.items.some(i=>i.name===name))
+      .sort((a,b)=>parseDate(a.date)-parseDate(b.date));
+    orders.forEach(o=>{
+      const od=parseDate(o.date);
+      let rem=o.items.filter(i=>i.name===name).reduce((s,i)=>s+i.qty,0);
+      for(const lot of lots){
+        if(rem<=0)break;
+        if(od<parseDate(lot.date))break;
+        const take=Math.min(lot.totalBags-lot.soldBags,rem);
+        lot.soldBags+=take;rem-=take;
+      }
+    });
+
+    // รายการปรับลด (เสียหาย/ให้แฮม/ตัวอย่าง)
+    const adjs=(S.dryAdjustments||[]).filter(a=>a.name===name)
+      .sort((a,b)=>a.date.localeCompare(b.date));
+    adjs.forEach(a=>{
+      let rem=a.qty;
+      for(const lot of lots){
+        if(rem<=0)break;
+        const take=Math.min(lot.totalBags-lot.soldBags,rem);
+        lot.soldBags+=take;rem-=take;
+      }
+    });
+
+    S.stock[name]=lots.reduce((s,l)=>s+Math.max(0,l.totalBags-l.soldBags),0);
+  });
+}
+
+function getFifoCost(name){
+  const lots=S.dryLots.filter(l=>l.name===name&&(l.totalBags-l.soldBags)>0).sort(lotSort);
+  return lots.length?lots[0].costPerBag:(INITIAL_COSTS[name]||0);
+}
+
+// ===================== FRESH STOCK =====================
+let freshBuyItems=[];
+const FRESH_UNITS=['ฝัก','หัว','หวี','ชิ้น','ลูก','กก.','ขีด'];
+const FRESH_NAMES=['ข้าวโพด','แครอท','ฟักทอง','แอปเปิ้ล','แตงกวา','บล็อคโคลี่','บวบ','กล้วย','ส้มแมนดาริน'];
+const FRESH_DEFAULT_UNIT={'ข้าวโพด':'ฝัก','แครอท':'หัว','ฟักทอง':'ชิ้น','แอปเปิ้ล':'ลูก','แตงกวา':'ลูก','บล็อคโคลี่':'หัว','บวบ':'ลูก','กล้วย':'หวี','ส้มแมนดาริน':'ลูก'};
+
+function addFreshBuyItem(){
+  freshBuyItems.push({id:Date.now()+Math.floor(Math.random()*9999),name:'',price:0,qty:0,unit:'ฝัก',note:''});
+  renderFreshBuyItems();
+}
+function removeFreshBuyItem(id){freshBuyItems=freshBuyItems.filter(i=>i.id!==id);renderFreshBuyItems();}
+function updateFreshBuyItem(id,field,val){
+  const item=freshBuyItems.find(i=>i.id===id);if(!item)return;
+  if(field==='name'){
+    item.name=val;
+    item.unit=FRESH_DEFAULT_UNIT[val]||'ฝัก';
+    renderFreshBuyItems();return;
+  }
+  item[field]=(field==='price'||field==='qty')?parseFloat(val)||0:val;
+  updateFreshTravelPreview();
+}
+function renderFreshBuyItems(){
+  const c=document.getElementById('f-items-list');if(!c)return;
+  if(!freshBuyItems.length){c.innerHTML='<div style="color:var(--text2);font-size:.83rem;margin-bottom:10px">กด "+ เพิ่มผัก/ผลไม้" เพื่อเริ่ม</div>';return;}
+  c.innerHTML=freshBuyItems.map(item=>`
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1.5fr auto;gap:8px;margin-bottom:8px;align-items:end">
+      <div class="form-group" style="margin-bottom:0"><label style="font-size:.75rem">ชื่อ</label>
+        <select onchange="updateFreshBuyItem(${item.id},'name',this.value)"><option value="">-- เลือก --</option>
+          ${FRESH_NAMES.map(n=>`<option ${n===item.name?'selected':''}>${n}</option>`).join('')}</select></div>
+      <div class="form-group" style="margin-bottom:0"><label style="font-size:.75rem">ราคา (฿)</label>
+        <input type="number" value="${item.price||''}" placeholder="0" step=".01" oninput="updateFreshBuyItem(${item.id},'price',this.value);updateFreshTravelPreview()"></div>
+      <div class="form-group" style="margin-bottom:0"><label style="font-size:.75rem">จำนวน</label>
+        <input type="number" value="${item.qty||''}" placeholder="0" step=".1" oninput="updateFreshBuyItem(${item.id},'qty',this.value);updateFreshTravelPreview()"></div>
+      <div class="form-group" style="margin-bottom:0"><label style="font-size:.75rem">หน่วย</label>
+        <input type="text" value="${item.unit||'ฝัก'}" readonly style="background:var(--surface2);padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:.88rem;color:var(--text2)"></div>
+      <div class="form-group" style="margin-bottom:0"><label style="font-size:.75rem">หมายเหตุ</label>
+        <input type="text" value="${item.note||''}" placeholder="(ไม่บังคับ)" oninput="updateFreshBuyItem(${item.id},'note',this.value)"></div>
+      <button class="btn btn-danger" onclick="removeFreshBuyItem(${item.id})" style="margin-bottom:1px">✕</button>
+    </div>`).join('');
+  updateFreshTravelPreview();
+}
+function updateFreshTravelPreview(){
+  const travel=parseFloat(document.getElementById('f-travel')?.value)||0;
+  const valid=freshBuyItems.filter(i=>i.name&&i.qty>0&&i.price>0);
+  const div=document.getElementById('f-travel-preview');
+  const sumDiv=document.getElementById('f-summary');
+  if(!div||!sumDiv)return;
+  if(!valid.length){div.style.display='none';sumDiv.style.display='none';return;}
+
+  const perItem=Math.round(travel/valid.length*100)/100;
+  const totalVeg=valid.reduce((s,i)=>s+i.price,0);
+  const totalAll=totalVeg+travel;
+
+  if(travel>0){
+    div.innerHTML=`🚗 ค่าเดินทาง ฿${travel.toFixed(2)} ÷ ${valid.length} ชนิด = <b>฿${perItem.toFixed(2)}/ชนิด</b>`;
+    div.style.display='';
+  } else {
+    div.style.display='none';
+  }
+
+  let html=`<div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:8px">
+    <span>🛒 ค่าผัก/ผลไม้รวม: <b>฿${totalVeg.toFixed(2)}</b></span>
+    <span>🚗 ค่าเดินทาง: <b>฿${travel.toFixed(2)}</b></span>
+    <span style="color:var(--accent)">💰 รวมทั้งหมด: <b>฿${totalAll.toFixed(2)}</b></span>
+  </div><div style="display:flex;gap:8px;flex-wrap:wrap">`;
+  valid.forEach(i=>{
+    const cpuNet=Math.round((i.price+perItem)/i.qty*100)/100;
+    html+=`<div style="background:#fff;border-radius:6px;padding:5px 10px;border:1px solid var(--border);font-size:.8rem">
+      <b>${FRESH_ICONS[i.name]||''} ${i.name}</b> ${i.qty}${i.unit} ฿${(i.price+perItem).toFixed(2)} →
+      <span style="color:var(--accent);font-weight:700">฿${cpuNet.toFixed(2)}/${i.unit}</span></div>`;
+  });
+  html+=`</div>`;
+  sumDiv.innerHTML=html;sumDiv.style.display='';
+}
+
+function saveFreshPurchase(){
+  const date=document.getElementById('f-date').value;
+  const travel=parseFloat(document.getElementById('f-travel').value)||0;
+  const valid=freshBuyItems.filter(i=>i.name&&i.qty>0&&i.price>0);
+  if(!date||!valid.length){showNotif('กรุณาเพิ่มผักอย่างน้อย 1 ชนิด','error');return;}
+  const travelPer=valid.length>0?Math.round(travel/valid.length*100)/100:0;
+  valid.forEach(item=>{
+    S.freshPurchases.push({id:Date.now()+Math.floor(Math.random()*9999),name:item.name,date,price:item.price,travel:travelPer,qty:item.qty,unit:item.unit,note:item.note,usedQty:0,pricePerUnit:round2((item.price+travelPer)/item.qty)});
+  });
+  saveState();renderFreshList();renderFreshStockGrid();
+  freshBuyItems=[];
+  document.getElementById('f-items-list').innerHTML='';
+  document.getElementById('f-travel').value='0';
+  document.getElementById('f-travel-preview').style.display='none';
+  showNotif(`บันทึก ${valid.length} ชนิดแล้ว ✅`);
+}
+
+function getFreshStock(name){return S.freshPurchases.filter(p=>p.name===name&&!p.isAdjust).reduce((s,p)=>s+p.qty-(p.usedQty||0),0);}
+function getFreshUnit(name){const p=S.freshPurchases.filter(x=>x.name===name).slice(-1)[0];return p?p.unit:'หน่วย';}
+
+function calcFifoCost(name,qty){
+  const lots=S.freshPurchases.filter(p=>p.name===name&&(p.qty-(p.usedQty||0))>0).sort((a,b)=>a.date.localeCompare(b.date));
+  let rem=qty,cost=0,used=[];
+  for(const l of lots){if(rem<=0)break;const take=Math.min(l.qty-(l.usedQty||0),rem);cost+=take*l.pricePerUnit;used.push({id:l.id,take});rem-=take;}
+  return{totalCost:round2(cost),shortage:rem,used};
+}
+
+function deductFresh(name,qty){
+  const lots=S.freshPurchases.filter(p=>p.name===name&&(p.qty-(p.usedQty||0))>0).sort((a,b)=>a.date.localeCompare(b.date));
+  let rem=qty;
+  for(const l of lots){if(rem<=0)break;const take=Math.min(l.qty-(l.usedQty||0),rem);l.usedQty=round2((l.usedQty||0)+take);rem-=take;}
+}
+
+function adjustFreshStock(){
+  const name=document.getElementById('adj-name').value,
+    qty=parseFloat(document.getElementById('adj-qty').value)||0,
+    reason=document.getElementById('adj-reason').value||'ปรับลด';
+  if(!name||qty<=0){showNotif('กรุณากรอกข้อมูล','error');return;}
+  const avail=getFreshStock(name);
+  if(qty>avail){showNotif(`สต็อก${name}เหลือแค่ ${avail.toFixed(1)} หน่วย`,'error');return;}
+  deductFresh(name,qty);
+  // Recalc pricePerUnit: ต้นทุนรวมที่เหลือ / จำนวนที่เหลือ
+  const remLots=S.freshPurchases.filter(p=>p.name===name&&!p.isAdjust&&(p.qty-(p.usedQty||0))>0);
+  const remQty=remLots.reduce((s,p)=>s+(p.qty-(p.usedQty||0)),0);
+  const remCost=remLots.reduce((s,p)=>s+(p.qty-(p.usedQty||0))*p.pricePerUnit,0);
+  if(remQty>0){const newPPU=round2(remCost/remQty);remLots.forEach(p=>{p.pricePerUnit=newPPU;});}
+  saveState();renderFreshList();renderFreshStockGrid();
+  document.getElementById('adj-name').value='';document.getElementById('adj-qty').value='';document.getElementById('adj-reason').value='';
+  showNotif(`ปรับลด ${name} -${qty} (${reason}) ต้นทุน/หน่วยอัพเดทแล้ว ✅`);
+}
+
+function editFresh(id){
+  const p=S.freshPurchases.find(x=>x.id===id);if(!p)return;
+  const d=prompt('วันที่:',p.date);if(!d)return;
+  const pr=parseFloat(prompt('ราคา:',p.price));if(isNaN(pr))return;
+  const q=parseFloat(prompt('จำนวน:',p.qty));if(isNaN(q)||q<=0)return;
+  const n=prompt('หมายเหตุ:',p.note||'');
+  p.date=d;p.price=pr;p.qty=q;p.pricePerUnit=round2(pr/q);p.note=n||'';
+  saveState();renderFreshList();renderFreshStockGrid();showNotif('แก้ไขแล้ว ✅');
+}
+
+function deleteFresh(id){
+  if(!confirm('ลบ?'))return;
+  S.freshPurchases=S.freshPurchases.filter(p=>p.id!==id);
+  saveState();renderFreshList();renderFreshStockGrid();
+}
+
+function renderFreshStockGrid(){
+  const g=document.getElementById('fresh-stock-grid');if(!g)return;
+  const names=Object.keys(FRESH_ICONS);
+  g.innerHTML=names.map(name=>{
+    const qty=getFreshStock(name),unit=getFreshUnit(name),pct=Math.min((qty/20)*100,100);
+    const cls=qty<=0?'stock-low':qty<=3?'stock-med':'';
+    return `<div class="prod-card ${cls}"><div class="pc-icon">${FRESH_ICONS[name]}</div><div class="pc-name">${name}</div><div class="pc-stock">${qty.toFixed(1)} ${unit} เหลือ</div><div class="stock-bar ${cls}"><div class="stock-fill" style="width:${pct}%"></div></div></div>`;
+  }).join('');
+}
+
+function renderFreshList(){
+  const tbody=document.getElementById('fresh-tbody');
+  const list=S.freshPurchases.filter(p=>!p.isAdjust).slice().reverse();
+  if(!list.length){tbody.innerHTML='<tr><td colspan="6"><div class="empty"><div class="ei">🥬</div><p>ยังไม่มีข้อมูล</p></div></td></tr>';return;}
+  tbody.innerHTML=list.map(p=>{
+    const rem=round2(p.qty-(p.usedQty||0)),pct=p.qty>0?(rem/p.qty*100):0;
+    const col=rem<=0?'var(--red)':rem<p.qty*0.3?'var(--yellow)':'var(--green)';
+    return `<tr><td>${p.date}</td><td><b>${p.name}</b>${p.note?`<br><span style="font-size:.75rem;color:var(--text2)">${p.note}</span>`:''}</td>
+    <td class="text-right">฿${p.price.toFixed(2)}<br><span style="font-size:.75rem;color:var(--text2)">฿${p.pricePerUnit.toFixed(2)}/${p.unit}</span></td>
+    <td class="text-right">${p.qty} ${p.unit}</td>
+    <td class="text-right"><b style="color:${col}">${rem.toFixed(1)}</b> ${p.unit}</td>
+    <td><span class="badge ${rem<=0?'badge-done':rem<p.qty?'badge-ship':'badge-pend'}">${rem<=0?'หมด':rem<p.qty?'บางส่วน':'ยังไม่ใช้'}</span></td>
+    <td style="display:flex;gap:4px"><button class="btn btn-outline btn-sm" onclick="editFresh(${p.id})">✏️</button><button class="btn btn-danger" onclick="deleteFresh(${p.id})">ลบ</button></td></tr>`;
+  }).join('');
+}
+
+// ===================== DRY LOT =====================
+let dryOutputItems=[],freshInputItems=[];
+
+function addFreshInput(){
+  freshInputItems.push({id:Date.now()+Math.floor(Math.random()*9999),name:'',qty:0,unit:''});
+  renderFreshInputs();
+}
+function removeFreshInput(id){freshInputItems=freshInputItems.filter(i=>i.id!==id);renderFreshInputs();previewDryCost();}
+function updateFreshInput(id,field,val){
+  const item=freshInputItems.find(i=>i.id===id);if(!item)return;
+  if(field==='name'){
+    item.name=val;item.unit=getFreshUnit(val)||'หน่วย';
+    const defs=FRESH_TO_DRY[val]||[];
+    defs.forEach(def=>{if(!dryOutputItems.some(o=>o.name===def.name)){dryOutputItems.push({id:Date.now()+Math.floor(Math.random()*9999),name:def.name,bags:0,slicesPerBag:def.slicesPerBag||null,remnantGrams:0});}});
+    renderFreshInputs();renderDryOutputs();
+  } else {item[field]=parseFloat(val)||0;}
+  updateFreshInfoBar();previewDryCost();
+}
+
+function renderFreshInputs(){
+  const c=document.getElementById('dry-fresh-inputs');if(!c)return;
+  if(!freshInputItems.length){c.innerHTML='<div style="color:var(--text2);font-size:.83rem;margin-bottom:12px">กด "+ เพิ่มวัตถุดิบ" เพื่อเริ่ม</div>';return;}
+  c.innerHTML=freshInputItems.map(item=>`
+    <div style="display:grid;grid-template-columns:2fr 1fr .7fr auto;gap:8px;margin-bottom:8px;align-items:end">
+      <div class="form-group" style="margin-bottom:0"><label style="font-size:.75rem">ชนิดผักสด</label>
+        <select onchange="updateFreshInput(${item.id},'name',this.value)"><option value="">-- เลือก --</option>${Object.keys(FRESH_ICONS).map(n=>`<option ${n===item.name?'selected':''}>${n}</option>`).join('')}</select></div>
+      <div class="form-group" style="margin-bottom:0"><label style="font-size:.75rem">จำนวน</label>
+        <input type="number" value="${item.qty||''}" placeholder="0" step=".1" oninput="updateFreshInput(${item.id},'qty',this.value)"></div>
+      <div class="form-group" style="margin-bottom:0"><label style="font-size:.75rem">หน่วย</label>
+        <input type="text" value="${item.unit||''}" readonly style="background:var(--surface2);padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:.88rem"></div>
+      <button class="btn btn-danger" onclick="removeFreshInput(${item.id})" style="margin-bottom:1px">✕</button>
+    </div>
+    ${item.name?`<div style="font-size:.78rem;color:var(--green);margin-bottom:10px;padding:6px 10px;background:var(--green-light);border-radius:6px">📦 ${item.name} เหลือ ${getFreshStock(item.name).toFixed(1)} ${item.unit}</div>`:''}
+  `).join('');
+}
+
+function updateFreshInfoBar(){
+  const d=document.getElementById('d-fresh-info');if(!d)return;
+  const v=freshInputItems.filter(i=>i.name&&i.qty>0);
+  if(!v.length){d.style.display='none';return;}
+  d.innerHTML=v.map(i=>{const{totalCost,shortage}=calcFifoCost(i.name,i.qty);return `<b>${i.name}</b> ${i.qty} ${i.unit} → ฿${totalCost.toFixed(2)}${shortage>0?` <span style="color:var(--red)">⚠️ขาด${shortage.toFixed(1)}</span>`:''}`}).join(' | ');
+  d.style.display='';
+}
+
+function addDryOutput(){
+  dryOutputItems.push({id:Date.now()+Math.floor(Math.random()*9999),name:'',bags:0,slicesPerBag:null,remnantGrams:0});
+  renderDryOutputs();
+}
+function removeDryOutput(id){dryOutputItems=dryOutputItems.filter(i=>i.id!==id);renderDryOutputs();previewDryCost();}
+function updateDryOutput(id,field,val){
+  const item=dryOutputItems.find(i=>i.id===id);if(!item)return;
+  if(field==='name'){
+    item.name=val;
+    if(val==='ข้าวโพด 3 แว่น')item.slicesPerBag=3;
+    else if(val==='ข้าวโพด 6 แว่น')item.slicesPerBag=6;
+    renderDryOutputs();
+  } else if(field==='slicesPerBag'){item.slicesPerBag=parseInt(val)||1;
+  } else {item[field]=parseFloat(val)||0;}
+  previewDryCost();
+}
+
+function renderDryOutputs(){
+  const c=document.getElementById('dry-outputs');if(!c)return;
+  const opts=['ข้าวโพด 3 แว่น','แครอท','ฟักทอง','แอปเปิ้ล','แตงกวา','บล็อคโคลี่','บวบ','กล้วย','ส้มแมนดาริน','ข้าวโพด 6 แว่น'];
+  const isCorn=n=>n==='ข้าวโพด 3 แว่น'||n==='ข้าวโพด 6 แว่น';
+  const remnant=name=>name?getPendingRemnant(name):{grams:0,cost:0};
+  c.innerHTML=dryOutputItems.map(item=>{
+    const r=remnant(item.name);
+    return `<div style="margin-bottom:12px">
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr ${isCorn(item.name)?'.8fr ':''} auto;gap:8px;align-items:end">
+        <div class="form-group" style="margin-bottom:0"><label style="font-size:.75rem">ชนิด</label>
+          <select onchange="updateDryOutput(${item.id},'name',this.value)"><option value="">-- เลือก --</option>${opts.map(n=>`<option ${n===item.name?'selected':''}>${n}</option>`).join('')}</select></div>
+        <div class="form-group" style="margin-bottom:0"><label style="font-size:.75rem">ถุงที่ได้</label>
+          <input type="number" value="${item.bags||''}" placeholder="20" step="1" oninput="updateDryOutput(${item.id},'bags',this.value)"></div>
+        <div class="form-group" style="margin-bottom:0"><label style="font-size:.75rem">เศษ (g)</label>
+          <input type="number" value="${item.remnantGrams||''}" placeholder="0" step=".1" oninput="updateDryOutput(${item.id},'remnantGrams',this.value)"></div>
+        ${isCorn(item.name)?`<div class="form-group" style="margin-bottom:0"><label style="font-size:.75rem">แว่น/ถุง</label>
+          <input type="number" value="${item.slicesPerBag||(item.name==='ข้าวโพด 3 แว่น'?3:6)}" min="1" step="1" oninput="updateDryOutput(${item.id},'slicesPerBag',this.value)" style="background:var(--accent-light)"></div>`:''}
+        <button class="btn btn-danger" onclick="removeDryOutput(${item.id})" style="margin-bottom:1px">✕</button>
+      </div>
+      ${r.grams>0?`<div style="margin-top:6px;padding:6px 10px;background:var(--accent-light);border-radius:6px;font-size:.78rem">⚠️ เศษสะสม: <b>${r.grams.toFixed(1)}g</b> ฿${r.cost.toFixed(2)} — จะรวมเข้าต้นทุน Lot นี้</div>`:''}
+    </div>`;
+  }).join('');
+  previewDryCost();
+}
+
+function getCostWeight(item){
+  const isCorn=item.name==='ข้าวโพด 3 แว่น'||item.name==='ข้าวโพด 6 แว่น';
+  if(isCorn){const spb=item.slicesPerBag||(item.name==='ข้าวโพด 3 แว่น'?3:6);return(item.bags||0)*spb;}
+  return item.bags||0;
+}
+
+function getPendingRemnant(name){
+  // เศษจาก Lot ที่ยังอยู่
+  const fromLots=S.dryLots
+    .filter(l=>l.name===name&&!l.isInit&&(l.remnantGrams||0)>0&&!l.remnantUsed)
+    .reduce((s,l)=>({grams:s.grams+(l.remnantGrams||0),cost:s.cost+(l.remnantCost||0)}),{grams:0,cost:0});
+  // เศษจาก Lot ที่ถูกลบแล้วแต่ยังไม่ได้ใช้
+  const fromDeleted=(S.pendingRemnants||{})[name]||{grams:0,cost:0};
+  return{grams:round2(fromLots.grams+fromDeleted.grams),cost:round2(fromLots.cost+fromDeleted.cost)};
+}
+
+function getBagCost(name){
+  const s=S.settings;
+  const sticker=s.sticker||0;
+  if(name==='ฟักทอง')return round2((s.bag1220||0)+(s.kanchuean||0)+sticker);
+  if(name==='ข้าวโพด 6 แว่น')return round2((s.bag1522||0)+(s.kanchuean||0)+sticker);
+  return round2((s.bag1217||0)+(s.kanchuean||0)+sticker);
+}
+
+function previewDryCost(){
+  const hours=parseFloat(document.getElementById('d-hours').value)||0;
+  const div=document.getElementById('dry-preview');if(!div)return;
+  const vf=freshInputItems.filter(i=>i.name&&i.qty>0);
+  if(!vf.length||!dryOutputItems.length){div.style.display='none';return;}
+  let rawCost=0;vf.forEach(i=>{rawCost+=calcFifoCost(i.name,i.qty).totalCost;});rawCost=round2(rawCost);
+  const elec=round2(hours*S.settings.elec),total=rawCost+elec;
+  const tw=dryOutputItems.reduce((s,i)=>s+getCostWeight(i),0);
+  let html=`<b>ต้นทุนผักสด:</b> ฿${rawCost.toFixed(2)} + <b>ค่าไฟ:</b> ฿${elec.toFixed(2)} = <b>฿${total.toFixed(2)}</b><br><br>`;
+  html+='<div style="display:flex;gap:10px;flex-wrap:wrap">';
+  dryOutputItems.forEach(item=>{
+    if(!item.name||!item.bags)return;
+    const w=getCostWeight(item),ratio=tw>0?w/tw:1/dryOutputItems.length;
+    const bc=getBagCost(item.name),rem=getPendingRemnant(item.name);
+    const sticker=S.settings.sticker||0;
+    const bagOnly=round2(bc-sticker); // ค่าถุง+กันชื้น ไม่รวมสติ๊กเกอร์
+    const cpb=round2((total*ratio+rem.cost)/item.bags+bc);
+    const wlabel=item.name.includes('ข้าวโพด')?`${w}แว่น(${(ratio*100).toFixed(0)}%)`:`${item.bags}ถุง(${(ratio*100).toFixed(0)}%)`;
+    html+=`<div style="background:#fff;border-radius:8px;padding:8px 12px;border:1px solid var(--border);min-width:160px">
+      <b>${PRODUCT_ICONS[item.name]||''} ${item.name}</b><br>
+      <span style="font-size:.75rem;color:var(--text2)">${wlabel} | ถุง ฿${bagOnly.toFixed(2)} + 🏷️฿${sticker.toFixed(3)}</span><br>
+      <span style="color:var(--accent);font-weight:700;font-family:'IBM Plex Mono',monospace">฿${cpb.toFixed(2)}/ถุง</span>
+    </div>`;
+  });
+  html+='</div>';div.innerHTML=html;div.style.display='';
+}
+
+function saveDryLot(){
+  const date=document.getElementById('d-date').value,hours=parseFloat(document.getElementById('d-hours').value)||0;
+  const vf=freshInputItems.filter(i=>i.name&&i.qty>0),vo=dryOutputItems.filter(i=>i.name&&i.bags>0);
+  if(!date||!vf.length||!vo.length){showNotif('กรุณากรอกข้อมูลให้ครบ','error');return;}
+  for(const fi of vf){const{shortage}=calcFifoCost(fi.name,fi.qty);if(shortage>0){showNotif(`สต็อก${fi.name}ไม่พอ`,'error');return;}}
+  let rawCost=0;vf.forEach(i=>{rawCost+=calcFifoCost(i.name,i.qty).totalCost;});rawCost=round2(rawCost);
+  const elec=round2(hours*S.settings.elec),total=rawCost+elec;
+  const tw=vo.reduce((s,i)=>s+getCostWeight(i),0),gid='lotg-'+Date.now();
+  const freshDesc=vf.map(i=>`${i.name} ${i.qty} ${i.unit||''}`).join(', ');
+  vo.forEach(item=>{
+    const w=getCostWeight(item),ratio=tw>0?w/tw:1/vo.length;
+    const bc=getBagCost(item.name),rem=getPendingRemnant(item.name);
+    const rs=round2(rawCost*ratio),es=round2(elec*ratio);
+    const cpb=round2((rs+es+rem.cost)/item.bags+bc);
+    const rg=item.remnantGrams||0,rc=rg>0?round2((rs+es)*(rg/(item.bags*10+rg))):0;
+    S.dryLots.push({id:'lot-'+Date.now()+'-'+Math.random().toString(36).slice(2,5),groupId:gid,date,name:item.name,freshDesc,rawCost:rs,elecCost:es,bagCost:round2(bc),rawQty:freshDesc,remnantGrams:rg,remnantCost:rc,remnantUsed:false,totalBags:item.bags,soldBags:0,costPerBag:cpb});
+    if(rem.grams>0){
+      S.dryLots.filter(l=>l.name===item.name&&!l.isInit&&(l.remnantGrams||0)>0&&!l.remnantUsed).forEach(l=>{l.remnantUsed=true;});
+      if(S.pendingRemnants&&S.pendingRemnants[item.name]) delete S.pendingRemnants[item.name];
+    }
+  });
+  vf.forEach(i=>deductFresh(i.name,i.qty));
+  recalcAllFifo();saveState();renderDryStock();renderDryLots();renderFreshList();renderFreshStockGrid();
+  freshInputItems=[];dryOutputItems=[];
+  document.getElementById('d-hours').value='';
+  document.getElementById('dry-fresh-inputs').innerHTML='';
+  document.getElementById('dry-outputs').innerHTML='';
+  document.getElementById('dry-preview').style.display='none';
+  document.getElementById('d-fresh-info').style.display='none';
+  showNotif(`บันทึก Lot แล้ว (${vo.length} ชนิด) ✅`);
+}
+
+function renderDryStock(){
+  const g=document.getElementById('dry-stock-grid');if(!g)return;
+  g.innerHTML=Object.keys(PRODUCT_ICONS).map(name=>{
+    const qty=S.stock[name]||0,cpb=getFifoCost(name),pct=Math.min((qty/30)*100,100);
+    const cls=qty===0?'stock-low':qty<=5?'stock-med':'';
+    return `<div class="prod-card ${cls}"><div class="pc-icon">${PRODUCT_ICONS[name]}</div><div class="pc-name">${name}</div><div class="pc-stock">${qty} ถุงเหลือ</div><div class="pc-cost">฿${cpb.toFixed(2)}/ถุง (FIFO)</div><div class="stock-bar ${cls}"><div class="stock-fill" style="width:${pct}%"></div></div></div>`;
+  }).join('');
+}
+
+function renderDryLots(){
+  const tbody=document.getElementById('dry-lots-tbody');
+  const lots=S.dryLots.filter(l=>l.name!=='(ต้นทุนตั้งต้น)').sort((a,b)=>parseDate(b.date)-parseDate(a.date));
+  const adjs=(S.dryAdjustments||[]).map(a=>({...a,isAdj:true})).sort((a,b)=>b.date.localeCompare(a.date));
+
+  if(!lots.length&&!adjs.length){tbody.innerHTML='<tr><td colspan="12"><div class="empty"><div class="ei">🥕</div><p>ยังไม่มีข้อมูล</p></div></td></tr>';return;}
+
+  // รวม lots + adjs เรียงตามวันที่
+  const allRows=[...lots.map(l=>({...l,isAdj:false})),...adjs].sort((a,b)=>{
+    const da=parseDate(a.date),db=parseDate(b.date);
+    return db-da;
+  });
+
+  tbody.innerHTML=allRows.map(row=>{
+    if(row.isAdj){
+      return `<tr style="background:rgba(192,57,43,.04)">
+        <td>${row.date}</td>
+        <td colspan="3" style="font-size:.78rem;color:var(--red)">📉 ${row.reason}${row.note?' — '+row.note:''}</td>
+        <td><b>${PRODUCT_ICONS[row.name]||''} ${row.name}</b></td>
+        <td></td>
+        <td class="text-right" style="color:var(--red)">-${row.qty}</td>
+        <td class="text-right" style="color:var(--red)">${row.qty}</td>
+        <td class="text-right">0</td>
+        <td></td>
+        <td class="text-right" style="color:var(--red);font-family:'IBM Plex Mono',monospace">-฿${row.totalCost.toFixed(2)}</td>
+        <td><button class="btn btn-danger" onclick="deleteAdjustment('${row.id}')">ลบ</button></td>
+      </tr>`;
+    }
+    const r=row.remnantGrams||0;
+    return `<tr style="${row.isInit?'background:rgba(245,166,35,.05)':''}">
+      <td>${row.date}${row.isInit?' <span style="font-size:.7rem;background:var(--accent-light);color:var(--accent);padding:1px 5px;border-radius:4px">ตั้งต้น</span>':''}</td>
+      <td style="font-size:.78rem;color:var(--text2)">${row.rawQty||'-'}</td>
+      <td class="text-right">฿${(row.rawCost||0).toFixed(2)}</td>
+      <td class="text-right">฿${(row.elecCost||0).toFixed(2)}</td>
+      <td><b>${PRODUCT_ICONS[row.name]||''} ${row.name}</b></td>
+      <td class="text-right" style="font-size:.78rem;color:var(--text2)">฿${(row.bagCost||0).toFixed(2)}</td>
+      <td class="text-right">${row.totalBags}</td>
+      <td class="text-right">${row.soldBags}</td>
+      <td class="text-right"><b>${row.totalBags-row.soldBags}</b></td>
+      <td class="text-right" style="font-size:.78rem;color:${r>0?'var(--accent)':'var(--text2)'}">${r>0?r+'g':'-'}</td>
+      <td class="text-right" style="color:var(--accent);font-family:'IBM Plex Mono',monospace">฿${row.costPerBag.toFixed(2)}</td>
+      <td style="display:flex;gap:4px">
+        ${!row.isInit?`<button class="btn btn-outline btn-sm" onclick="editDryLot('${row.id}')">✏️</button>`:''}
+        <button class="btn btn-danger" onclick="deleteDryLot('${row.id}')">ลบ</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function deleteAdjustment(id){
+  if(!confirm('ลบรายการปรับลดนี้?'))return;
+  const adj=(S.dryAdjustments||[]).find(a=>a.id===id);
+  if(adj){
+    // คืนสต็อกและ soldBags กลับ
+    S.stock[adj.name]=(S.stock[adj.name]||0)+adj.qty;
+    // คืน soldBags จาก Lot ล่าสุดที่ถูกตัด
+    const lots=S.dryLots.filter(l=>l.name===adj.name&&l.soldBags>0).sort((a,b)=>parseDate(b.date)-parseDate(a.date));
+    let rem=adj.qty;
+    for(const lot of lots){
+      if(rem<=0)break;
+      const give=Math.min(lot.soldBags,rem);
+      lot.soldBags-=give;rem-=give;
+    }
+  }
+  S.dryAdjustments=(S.dryAdjustments||[]).filter(a=>a.id!==id);
+  saveState();renderDryStock();renderDryLots();renderOverview();
+  showNotif('ลบรายการปรับลดแล้ว ✅');
+}
+
+function editDryLot(id){
+  const l=S.dryLots.find(x=>x.id===id);if(!l)return;
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML=`<div style="background:var(--surface);border-radius:var(--radius);padding:24px;max-width:520px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.3);max-height:90vh;overflow-y:auto">
+    <div style="font-weight:700;color:var(--accent);margin-bottom:18px">✏️ แก้ไข Lot — ${l.name}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div class="form-group"><label>วันที่อบ</label><input type="date" id="el-date" value="${l.date}"></div>
+      <div class="form-group"><label>วัตถุดิบ</label><input type="text" id="el-rawqty" value="${l.rawQty||''}"></div>
+      <div class="form-group"><label>ต้นทุนผักสด (฿)</label><input type="number" id="el-rawcost" value="${l.rawCost||0}" step=".01"></div>
+      <div class="form-group"><label>ค่าไฟ (฿)</label><input type="number" id="el-elec" value="${l.elecCost||0}" step=".01"></div>
+      <div class="form-group"><label>ถุงทั้งหมด</label><input type="number" id="el-bags" value="${l.totalBags}" min="1" step="1"></div>
+      <div class="form-group"><label>เศษ (g)</label><input type="number" id="el-remnant" value="${l.remnantGrams||0}" min="0" step=".1"></div>
+    </div>
+    <div style="background:var(--accent-light);border-radius:8px;padding:10px 14px;font-size:.82rem;margin-bottom:16px" id="el-preview">ต้นทุน/ถุง จะคำนวณใหม่เมื่อกดบันทึก</div>
+    <div style="display:flex;gap:10px"><button class="btn btn-primary" onclick="saveEditDryLot('${id}')">💾 บันทึก</button><button class="btn btn-outline" onclick="this.closest('[style*=fixed]').remove()">ยกเลิก</button></div>
+  </div>`;
+  document.body.appendChild(ov);
+  ['el-rawcost','el-elec','el-bags'].forEach(eid=>{
+    document.getElementById(eid)?.addEventListener('input',()=>{
+      const rc=parseFloat(document.getElementById('el-rawcost').value)||0,ec=parseFloat(document.getElementById('el-elec').value)||0,bags=parseInt(document.getElementById('el-bags').value)||1,bc=getBagCost(l.name);
+      document.getElementById('el-preview').innerHTML=`฿/ถุง = (฿${rc.toFixed(2)}+฿${ec.toFixed(2)})/${bags} + ฿${bc.toFixed(2)} = <b style="color:var(--accent)">฿${round2((rc+ec)/bags+bc).toFixed(2)}</b>`;
+    });
+  });
+}
+
+function saveEditDryLot(id){
+  const l=S.dryLots.find(x=>x.id===id);if(!l)return;
+  const nb=parseInt(document.getElementById('el-bags').value)||0;
+  if(nb<=0){showNotif('จำนวนถุงต้องมากกว่า 0','error');return;}
+  const newDate=document.getElementById('el-date').value;
+  const newRawQty=document.getElementById('el-rawqty').value;
+  const newRawCost=parseFloat(document.getElementById('el-rawcost').value)||0;
+  const newElec=parseFloat(document.getElementById('el-elec').value)||0;
+  const newRemnant=parseFloat(document.getElementById('el-remnant').value)||0;
+
+  // อัพเดท Lot นี้ก่อน
+  const diff=nb-l.totalBags;
+  S.stock[l.name]=Math.max(0,(S.stock[l.name]||0)+diff);
+  l.date=newDate;l.rawQty=newRawQty;
+  l.rawCost=newRawCost;l.elecCost=newElec;
+  l.totalBags=nb;l.remnantGrams=newRemnant;
+  l.bagCost=round2(getBagCost(l.name));
+
+  // ถ้าอยู่ใน group (อบพร้อมกัน) → recalc ทั้ง group ด้วย ratio ใหม่
+  if(l.groupId){
+    const groupLots=S.dryLots.filter(x=>x.groupId===l.groupId&&!x.isInit);
+    if(groupLots.length>1){
+      // คำนวณ total cost รวมของ group (rawCost+elecCost ของทุก Lot)
+      const totalRaw=groupLots.reduce((s,x)=>s+(x.rawCost||0),0);
+      const totalElec=groupLots.reduce((s,x)=>s+(x.elecCost||0),0);
+      const totalCost=totalRaw+totalElec;
+
+      // คำนวณ weight ใหม่ของแต่ละ Lot (แว่น หรือถุง)
+      const totalWeight=groupLots.reduce((s,x)=>s+getCostWeight({name:x.name,bags:x.totalBags,slicesPerBag:x.slicesPerBag}),0);
+
+      if(totalWeight>0 && totalCost>0){
+        groupLots.forEach(x=>{
+          const w=getCostWeight({name:x.name,bags:x.totalBags,slicesPerBag:x.slicesPerBag});
+          const ratio=w/totalWeight;
+          x.rawCost=round2(totalRaw*ratio);
+          x.elecCost=round2(totalElec*ratio);
+          x.bagCost=round2(getBagCost(x.name));
+          x.costPerBag=round2((x.rawCost+x.elecCost)/x.totalBags+x.bagCost);
+        });
+      }
+    } else {
+      // Lot เดียวใน group → คำนวณตรงๆ
+      l.costPerBag=round2((newRawCost+newElec)/nb+l.bagCost);
+    }
+  } else {
+    l.costPerBag=round2((newRawCost+newElec)/nb+l.bagCost);
+  }
+
+  document.querySelector('[style*="position:fixed"]')?.remove();
+  recalcAllFifo();saveState();renderDryStock();renderDryLots();
+  showNotif('แก้ไขแล้ว (recalc ทั้ง group) ✅');
+}
+
+function deleteDryLot(id){
+  if(!confirm('ลบ Lot นี้? สต็อกจะถูกปรับกลับ'))return;
+  const lot=S.dryLots.find(l=>l.id===id);
+  if(lot){
+    // ถ้ามีเศษที่ยังไม่ได้ใช้ → เก็บไว้ใน pendingRemnants
+    if((lot.remnantGrams||0)>0&&!lot.remnantUsed){
+      if(!S.pendingRemnants)S.pendingRemnants={};
+      if(!S.pendingRemnants[lot.name])S.pendingRemnants[lot.name]={grams:0,cost:0};
+      S.pendingRemnants[lot.name].grams=round2(S.pendingRemnants[lot.name].grams+(lot.remnantGrams||0));
+      S.pendingRemnants[lot.name].cost=round2(S.pendingRemnants[lot.name].cost+(lot.remnantCost||0));
+    }
+    // คืน fresh stock
+    if(lot.freshDesc){
+      lot.freshDesc.split(',').forEach(part=>{
+        const t=part.trim().split(' '),unit=t[t.length-1],qty=parseFloat(t[t.length-2]),name=t.slice(0,t.length-2).join(' ');
+        if(!name||isNaN(qty)||qty<=0)return;
+        S.freshPurchases.filter(p=>p.name===name&&(p.usedQty||0)>0).sort((a,b)=>a.date.localeCompare(b.date)).forEach(p=>{
+          if(qty<=0)return;const take=Math.min(p.usedQty||0,qty);p.usedQty=round2((p.usedQty||0)-take);
+        });
+      });
+    }
+  }
+  S.dryLots=S.dryLots.filter(l=>l.id!==id);
+  recalcAllFifo();saveState();renderDryStock();renderDryLots();renderFreshList();renderFreshStockGrid();showNotif('ลบแล้ว สต็อกปรับกลับแล้ว ✅');
+}
+
+// ===================== IMPORT =====================
+let pendingCSV=null,pendingXLSX=null,pendingOrders=null,pendingUpdates=null;
+
+function handleDrop(e,type){e.preventDefault();document.getElementById('zone-'+type).classList.remove('dragover');const f=e.dataTransfer.files[0];if(!f)return;type==='csv'?processCSVFile(f):processXLSXFile(f);}
+function loadCSV(inp){if(inp.files[0])processCSVFile(inp.files[0]);}
+function loadXLSX(inp){if(inp.files[0])processXLSXFile(inp.files[0]);}
+
+function processCSVFile(file){
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const lines=e.target.result.split('\n'),headers=lines[0].split(',').map(h=>h.trim().replace(/"/g,''));
+      pendingCSV=[];
+      for(let i=1;i<lines.length;i++){if(!lines[i].trim())continue;const vals=parseCSVLine(lines[i]),row={};headers.forEach((h,j)=>row[h]=(vals[j]||'').replace(/"/g,'').trim());pendingCSV.push(row);}
+      showFileReady('csv-status',file.name,pendingCSV.length+' แถว');tryPreview();
+    }catch(err){showNotif('อ่าน CSV ไม่ได้: '+err.message,'error');}
+  };r.readAsText(file,'UTF-8');
+}
+
+function parseCSVLine(line){
+  const res=[];let cur='',inQ=false;
+  for(const c of line){if(c==='"'){inQ=!inQ;}else if(c===','&&!inQ){res.push(cur);cur='';}else cur+=c;}
+  res.push(cur);return res;
+}
+
+function processXLSXFile(file){
+  const r=new FileReader();
+  r.onload=e=>{
+    try{const wb=XLSX.read(e.target.result,{type:'array'}),ws=wb.Sheets['รายละเอียดคำสั่งซื้อ']||wb.Sheets[wb.SheetNames[0]];
+      pendingXLSX=XLSX.utils.sheet_to_json(ws,{defval:0});
+      showFileReady('xlsx-status',file.name,pendingXLSX.length+' ออเดอร์');tryPreview();
+    }catch(err){showNotif('อ่าน XLSX ไม่ได้: '+err.message,'error');}
+  };r.readAsArrayBuffer(file);
+}
+
+function showFileReady(elId,name,info){document.getElementById(elId).innerHTML=`<div class="file-ready">✅ <b>${name}</b> — ${info}</div>`;}
+
+function getPackCost(qty,hasCorn6){
+  if(hasCorn6||qty>=5)return S.settings.pack3;
+  if(qty>=3)return S.settings.pack2;
+  return S.settings.pack1;
+}
+
+function tryPreview(){
+  if(!pendingXLSX)return;
+  const incMap={};pendingXLSX.forEach(r=>{const id=String(r['หมายเลขคำสั่งซื้อ/การปรับ']||'').trim();if(id)incMap[id]=r;});
+  const exMap={};S.orders.forEach(o=>exMap[o.id]=o);
+  const orderMap={};
+  if(pendingCSV){
+    pendingCSV.forEach(r=>{
+      const oid=String(r['Order ID']||'').trim(),status=(r['Order Status']||'').trim();
+      if(!oid||!['เสร็จสมบูรณ์','จัดส่งแล้ว','ที่จะจัดส่ง'].includes(status))return;
+      if(!orderMap[oid])orderMap[oid]={id:oid,status,date:(r['Created Time']||'').split(' ')[0].trim(),
+        shippedDate:(r['Shipped Time']||'').trim().replace(/\\t/g,'')||null,items:[]};
+      const name=VAR_MAP[r['Variation']||'']||(r['Variation']||'');
+      orderMap[oid].items.push({variation:r['Variation']||'',name,qty:parseInt(r['Quantity'])||1,costPerBag:getFifoCost(name)});
+    });
+  }
+  let newCount=0,dupCount=0,updateCount=0;
+  pendingOrders=[];pendingUpdates=[];
+  Object.values(orderMap).forEach(o=>{
+    // revenue: ดึงจาก Income ก่อน ถ้าไม่มีใช้ SKU Subtotal After Discount จาก CSV (sum ทุก row ของ order)
+    const inc=incMap[o.id];
+    const fee=inc?round2(Math.abs(parseFloat(inc['ค่าธรรมเนียมทั้งหมด'])||0)):0;
+    const incRev=inc?round2(parseFloat(inc['รายได้รวม'])||0):0;
+    let csvRev=0;
+    if(!incRev&&pendingCSV){
+      // หาค่า Order Amount จาก row แรกของ order นี้ (ทุก row ใช้ค่าเดียวกัน)
+      const csvRows=pendingCSV.filter(r=>String(r['Order ID']||'').trim()===o.id);
+      if(csvRows.length>0){
+        const orderAmt=parseFloat(csvRows[0]['Order Amount']||0);
+        // Order Amount = ยอดที่ลูกค้าจ่ายจริง แต่รายได้ร้าน = SKU Subtotal After Discount รวม
+        const skuTotal=csvRows.reduce((s,r)=>s+parseFloat(r['SKU Subtotal After Discount']||0),0);
+        csvRev=round2(skuTotal);
+      }
+    }
+    const rev=incRev>0?incRev:(csvRev>0?csvRev:0);
+    if(exMap[o.id]){
+      const ex=exMap[o.id];
+      const needFeeUpdate=ex.tiktokFee===0&&fee>0;
+      const needStatusUpdate=o.status&&o.status!==ex.status;
+      const needRevenueUpdate=ex.revenue===0&&rev>0;
+      if(needFeeUpdate||needStatusUpdate||needRevenueUpdate){
+        const newFee=needFeeUpdate?fee:ex.tiktokFee;
+        const newRev=needRevenueUpdate||needFeeUpdate?(rev||ex.revenue):ex.revenue;
+        const nc=round2(ex.productCost+ex.packCost+newFee);
+        const np=round2(newRev-nc);
+        pendingUpdates.push({id:o.id,tiktokFee:newFee,revenue:newRev,totalCost:nc,profit:np,status:o.status});
+        updateCount++;
+      } else {dupCount++;}
+      return;
+    }
+    const tq=o.items.reduce((s,i)=>s+i.qty,0),hc=o.items.some(i=>i.variation==='ค่าเริ่มต้น');
+    const pc=round2(o.items.reduce((s,i)=>s+i.costPerBag*i.qty,0)),pk=getPackCostFifo(tq,hc,o.date),tc=round2(pc+pk+fee),pr=round2(rev-tc);
+    pendingOrders.push({id:o.id,date:o.date,shippedDate:o.shippedDate||null,status:o.status,items:o.items,totalQty:tq,hasCorn6:hc,revenue:rev,productCost:pc,packCost:pk,tiktokFee:fee,deliveryCost:0,totalCost:tc,profit:pr});newCount++;
+  });
+  if(!pendingCSV){Object.keys(incMap).forEach(id=>{const ex=exMap[id];if(ex&&ex.tiktokFee===0){const inc=incMap[id],fee=round2(Math.abs(parseFloat(inc['ค่าธรรมเนียมทั้งหมด'])||0)),rev=round2(parseFloat(inc['รายได้รวม'])||0);if(fee>0){const nc=round2(ex.productCost+ex.packCost+fee),np=round2((rev||ex.revenue)-nc);pendingUpdates.push({id,tiktokFee:fee,revenue:rev||ex.revenue,totalCost:nc,profit:np});updateCount++;}}});}
+  document.getElementById('preview-stats').innerHTML=`
+    <div class="stat-card"><div class="s-label">ออเดอร์ใหม่</div><div class="s-val s-green">${newCount}</div></div>
+    <div class="stat-card"><div class="s-label">อัพเดท Fee</div><div class="s-val s-blue">${updateCount}</div></div>
+    <div class="stat-card"><div class="s-label">ซ้ำ</div><div class="s-val s-accent">${dupCount}</div></div>
+    <div class="stat-card"><div class="s-label">รายได้ใหม่</div><div class="s-val s-blue">฿${pendingOrders.reduce((s,o)=>s+o.revenue,0).toFixed(0)}</div></div>`;
+  const rows=[...pendingOrders.map(o=>`<tr><td style="font-family:monospace;font-size:.75rem">${o.id.slice(-8)}</td><td>${o.date}</td><td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td><td style="max-width:180px;white-space:normal;font-size:.78rem">${o.items.map(i=>`${i.name}×${i.qty}`).join(', ')}</td><td class="text-right">${o.totalQty}</td><td class="text-right">฿${o.revenue.toFixed(2)}</td><td class="text-right">฿${o.productCost.toFixed(2)}</td><td class="text-right">฿${o.packCost.toFixed(2)}</td><td class="text-right">฿${o.tiktokFee.toFixed(2)}</td><td class="text-right ${o.profit>=0?'profit-pos':'profit-neg'}">฿${o.profit.toFixed(2)}</td></tr>`),
+    ...pendingUpdates.map(u=>{const ex=exMap[u.id];return `<tr style="background:rgba(45,111,164,.06)"><td style="font-family:monospace;font-size:.75rem">${u.id.slice(-8)}</td><td>${ex?.date||''}</td><td><span class="badge badge-done">อัพเดท Fee</span></td><td style="max-width:180px;white-space:normal;font-size:.78rem">${(ex?.items||[]).map(i=>`${i.name}×${i.qty}`).join(', ')}</td><td class="text-right">${ex?.totalQty||''}</td><td class="text-right">฿${u.revenue.toFixed(2)}</td><td class="text-right">฿${(ex?.productCost||0).toFixed(2)}</td><td class="text-right">฿${(ex?.packCost||0).toFixed(2)}</td><td class="text-right" style="color:var(--accent)">฿${u.tiktokFee.toFixed(2)}</td><td class="text-right ${u.profit>=0?'profit-pos':'profit-neg'}">฿${u.profit.toFixed(2)}</td></tr>`})];
+  document.getElementById('preview-tbody').innerHTML=rows.join('');
+  document.getElementById('import-preview').style.display='';
+}
+
+function confirmImport(){
+  const saved=pendingOrders?.length||0,updated=pendingUpdates?.length||0;
+  (pendingOrders||[]).forEach(o=>{
+    S.orders.push(o);
+    // ตัดสต็อก dry bags
+    o.items.forEach(item=>{
+      if(S.stock[item.name]!==undefined)
+        S.stock[item.name]=Math.max(0,S.stock[item.name]-item.qty);
+    });
+    // ตัดกล่อง FIFO หลัง BOX_FIFO_START
+    const od=new Date(o.date.includes('/')?o.date.split('/').reverse().join('-'):o.date);
+    if(od>=BOX_FIFO_START&&o.totalQty>0){
+      const useB=o.hasCorn6||o.totalQty>=5;
+      const useAB=!useB&&o.totalQty>=3;
+      if(useB) deductBoxFifo('B',1);
+      else if(useAB) deductBoxFifo('AB',1);
+    }
+  });
+  (pendingUpdates||[]).forEach(u=>{const o=S.orders.find(x=>x.id===u.id);if(o){o.tiktokFee=u.tiktokFee;o.revenue=u.revenue;o.totalCost=u.totalCost;o.profit=u.profit;if(u.status)o.status=u.status;}});
+  recalcAllFifo();
+  recalcDeliveryCosts();
+  saveState();
+  pendingCSV=null;pendingXLSX=null;pendingOrders=null;pendingUpdates=null;
+  document.getElementById('import-preview').style.display='none';
+  document.getElementById('csv-status').innerHTML='';document.getElementById('xlsx-status').innerHTML='';
+  document.getElementById('inp-csv').value='';document.getElementById('inp-xlsx').value='';
+  showNotif(`เพิ่ม ${saved} ออเดอร์ | อัพเดท ${updated} fee ✅`);
+  renderDryStock();renderOverview();renderOrders();renderFreshStockGrid();
+}
+function cancelImport(){pendingCSV=null;pendingXLSX=null;pendingOrders=null;pendingUpdates=null;document.getElementById('import-preview').style.display='none';}
+
+// ===================== PROFIT =====================
+let profitChart=null,qtyChart=null;
+
+function clearOverviewFilters(){
+  document.getElementById('filter-year').value='';
+  document.getElementById('filter-month').value='';
+  renderOverview();
+}
+
+function renderOverview(){
+  const fyear=document.getElementById('filter-year')?.value||'';
+  const fmonth=document.getElementById('filter-month')?.value||'';
+
+  // Populate year dropdown
+  const yearEl=document.getElementById('filter-year');
+  if(yearEl){
+    const allYears=[...new Set([...S.orders,...(S.manualSales||[])].map(o=>{
+      const p=o.date?.split('/');return p?.length===3?p[2]:null;
+    }).filter(Boolean))].sort().reverse();
+    const currentYears=new Set([...yearEl.options].map(o=>o.value).filter(Boolean));
+    allYears.forEach(y=>{if(!currentYears.has(y)){const opt=document.createElement('option');opt.value=y;opt.textContent=`พ.ศ. ${parseInt(y)+543}`;yearEl.appendChild(opt);}});
+  }
+
+  const allOrders=[...S.orders,...(S.manualSales||[])].filter(o=>{
+    if(!o.date)return false;
+    const p=o.date.split('/');
+    if(p.length!==3)return true;
+    if(fyear&&p[2]!==fyear)return false;
+    if(fmonth&&p[1]!==fmonth)return false;
+    return true;
+  });
+
+  // Update filter label
+  const labelEl=document.getElementById('overview-filter-label');
+  if(labelEl){
+    const monthNames=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    if(fyear||fmonth) labelEl.textContent=`แสดง: ${fmonth?monthNames[parseInt(fmonth)]:'ทุกเดือน'} ${fyear?'พ.ศ.'+(parseInt(fyear)+543):'ทุกปี'} (${allOrders.length} ออเดอร์)`;
+    else labelEl.textContent='';
+  }
+  const orders=allOrders;
+  const tr=orders.reduce((s,o)=>s+o.revenue,0),tc=orders.reduce((s,o)=>s+o.totalCost,0),tp=orders.reduce((s,o)=>s+o.profit,0);
+  const done=orders.filter(o=>o.status==='เสร็จสมบูรณ์');
+  const dp=done.reduce((s,o)=>s+o.profit,0),margin=tr>0?(tp/tr*100):0;
+  const sv=Object.entries(S.stock).reduce((s,[n,q])=>s+q*(getFifoCost(n)||0),0);
+  const tiktokOrders=S.orders.length,manualOrders=(S.manualSales||[]).length;
+  const totalLoss=round2((S.dryAdjustments||[]).reduce((s,a)=>s+a.totalCost,0));
+  const totalDeliveryTT=round2(S.orders.reduce((s,o)=>s+(o.deliveryCost||0),0));
+  const totalTravelFresh=round2(S.freshPurchases.filter(p=>!p.isAdjust).reduce((s,p)=>s+(p.travel||0),0));
+  const totalTransport=round2(totalDeliveryTT+totalTravelFresh);
+  document.getElementById('overview-stats').innerHTML=`
+    <div class="stat-card"><div class="s-label">รายได้รวม (${orders.length} ออเดอร์)</div><div class="s-val s-blue">฿${tr.toFixed(0)}</div><div class="s-sub">TikTok ${tiktokOrders} | อื่นๆ ${manualOrders}</div></div>
+    <div class="stat-card"><div class="s-label">ต้นทุนรวม</div><div class="s-val s-accent">฿${tc.toFixed(0)}</div></div>
+    <div class="stat-card"><div class="s-label">กำไรสุทธิรวม</div><div class="s-val ${tp>=0?'s-green':'s-red'}">฿${tp.toFixed(0)}</div></div>
+    <div class="stat-card"><div class="s-label">กำไรเสร็จสมบูรณ์</div><div class="s-val s-green">฿${dp.toFixed(0)}</div><div class="s-sub">${done.length} ออเดอร์</div></div>
+    <div class="stat-card"><div class="s-label">Margin เฉลี่ย</div><div class="s-val s-blue">${margin.toFixed(1)}%</div></div>
+    <div class="stat-card"><div class="s-label">มูลค่าสต็อก</div><div class="s-val s-accent">฿${sv.toFixed(0)}</div><div class="s-sub">${Object.values(S.stock).reduce((s,v)=>s+v,0)} ถุง</div></div>
+    <div class="stat-card"><div class="s-label">ของสูญเสีย 🐹</div><div class="s-val s-red">฿${totalLoss.toFixed(0)}</div><div class="s-sub">${(S.dryAdjustments||[]).length} รายการ</div></div>
+    <div class="stat-card"><div class="s-label">ค่าขนส่งรวม 🚗</div><div class="s-val s-red">฿${totalTransport.toFixed(0)}</div><div class="s-sub">ส่งออเดอร์ ฿${totalDeliveryTT.toFixed(0)} | ซื้อผัก ฿${totalTravelFresh.toFixed(0)}</div></div>`;
+  const pd={};
+  orders.forEach(o=>o.items.forEach(item=>{
+    if(!pd[item.name])pd[item.name]={qty:0,rev:0,cost:0,profit:0};
+    const sh=o.totalQty>0?item.qty/o.totalQty:0;
+    pd[item.name].qty+=item.qty;pd[item.name].rev+=o.revenue*sh;pd[item.name].cost+=o.totalCost*sh;pd[item.name].profit+=o.profit*sh;
+  }));
+  // Daily profit chart (30 วันล่าสุด)
+  const dailyMap={};
+  [...S.orders,...(S.manualSales||[])].forEach(o=>{
+    const d=o.date;if(!d)return;
+    if(!dailyMap[d])dailyMap[d]={rev:0,profit:0};
+    dailyMap[d].rev+=o.revenue;dailyMap[d].profit+=o.profit;
+  });
+  const sortedDays=Object.keys(dailyMap).sort((a,b)=>parseOrderDate(a)-parseOrderDate(b)).slice(-30);
+  const dailyLabels=sortedDays.map(d=>{const p=d.split('/');return p.length===3?`${p[0]}/${p[1]}`:d;});
+  const dailyProfits=sortedDays.map(d=>round2(dailyMap[d].profit));
+  const dailyRevs=sortedDays.map(d=>round2(dailyMap[d].rev));
+  if(window._dailyChart)window._dailyChart.destroy();
+  const dc=document.getElementById('chart-daily');
+  if(dc)window._dailyChart=new Chart(dc,{type:'bar',
+    data:{labels:dailyLabels,datasets:[
+      {label:'กำไร',data:dailyProfits,backgroundColor:'rgba(58,124,92,.7)',borderRadius:4},
+      {label:'รายได้',data:dailyRevs,backgroundColor:'rgba(45,111,164,.2)',borderRadius:4,type:'line',borderColor:'rgba(45,111,164,.7)',fill:false,tension:.3}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{family:'Noto Sans Thai'}}}},
+      scales:{y:{ticks:{callback:v=>'฿'+v.toFixed(0)}}}}});
+  const sorted=Object.entries(pd).sort((a,b)=>b[1].profit-a[1].profit);
+  document.getElementById('product-summary-tbody').innerHTML=sorted.map(([name,d],i)=>{
+    const m=d.rev>0?(d.profit/d.rev*100):0;
+    return `<tr><td><b>${i===0?'🥇':i===1?'🥈':i===2?'🥉':'  '} ${PRODUCT_ICONS[name]||'🌿'} ${name}</b></td><td class="text-right">${d.qty}</td><td class="text-right">฿${d.rev.toFixed(0)}</td><td class="text-right">฿${d.cost.toFixed(0)}</td><td class="text-right ${d.profit>=0?'profit-pos':'profit-neg'}">฿${d.profit.toFixed(0)}</td><td class="text-right">฿${d.qty>0?(d.profit/d.qty).toFixed(2):'0'}</td><td class="text-right">${m.toFixed(1)}%</td></tr>`;
+  }).join('');
+  const labels=sorted.map(([n])=>n),profits=sorted.map(([,d])=>round2(d.profit)),qtys=sorted.map(([,d])=>d.qty);
+  const colors=['#3a7c5c','#c8873a','#2d6fa4','#c0392b','#d4a017','#7b5ea7','#2980b9','#27ae60','#e67e22'];
+  if(profitChart)profitChart.destroy();
+  profitChart=new Chart(document.getElementById('chart-profit'),{type:'bar',data:{labels,datasets:[{data:profits,backgroundColor:colors,borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>'฿'+v.toFixed(0)}}}}});
+  if(qtyChart)qtyChart.destroy();
+  qtyChart=new Chart(document.getElementById('chart-qty'),{type:'doughnut',data:{labels,datasets:[{data:qtys,backgroundColor:colors}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{family:'Noto Sans Thai'}}}}}});
+}
+
+function parseOrderDate(d){if(!d)return new Date(0);if(d.includes('/'))return new Date(d.split('/').reverse().join('-'));return new Date(d);}
+function clearOrderFilters(){document.getElementById('filter-status').value='';document.getElementById('filter-date-from').value='';document.getElementById('filter-date-to').value='';renderOrders();}
+
+function renderOrders(){
+  const fs=document.getElementById('filter-status').value,ff=document.getElementById('filter-date-from').value,ft=document.getElementById('filter-date-to').value;
+  let orders=S.orders;
+  if(fs)orders=orders.filter(o=>o.status===fs);
+  if(ff)orders=orders.filter(o=>parseOrderDate(o.date)>=new Date(ff));
+  if(ft)orders=orders.filter(o=>parseOrderDate(o.date)<=new Date(ft+'T23:59:59'));
+  const sorted=[...orders].sort((a,b)=>parseOrderDate(b.date)-parseOrderDate(a.date));
+  const tr=sorted.reduce((s,o)=>s+o.revenue,0),tp=sorted.reduce((s,o)=>s+o.profit,0);
+  document.getElementById('order-count').textContent=`${sorted.length} ออเดอร์ | รายได้ ฿${tr.toFixed(0)} | กำไร ฿${tp.toFixed(0)}`;
+  document.getElementById('orders-tbody').innerHTML=sorted.map(o=>{
+    const m=o.revenue>0?(o.profit/o.revenue*100):0;
+    return `<tr><td style="font-family:monospace;font-size:.75rem;color:var(--text2)">${o.id.slice(-8)}</td><td>${o.date}</td><td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td><td style="max-width:200px;white-space:normal;font-size:.78rem">${o.items.map(i=>`${PRODUCT_ICONS[i.name]||''}${i.name}×${i.qty}`).join(', ')}</td><td class="text-right">${o.totalQty}</td><td class="text-right">฿${o.revenue.toFixed(2)}</td><td class="text-right">฿${o.productCost.toFixed(2)}</td><td class="text-right">฿${o.packCost.toFixed(2)}</td><td class="text-right">฿${o.tiktokFee.toFixed(2)}</td><td class="text-right ${o.profit>=0?'profit-pos':'profit-neg'}">฿${o.profit.toFixed(2)}</td><td class="text-right">${m.toFixed(1)}%</td></tr>`;
+  }).join('');
+}
+
+function saveDeliverySettings(){
+  const s=S.settings;
+  s.fuel91=parseFloat(document.getElementById('set-fuel91').value)||43.68;
+  s.fuel95=parseFloat(document.getElementById('set-fuel95').value)||44.05;
+  s.motoKmpl=parseFloat(document.getElementById('set-moto-kmpl').value)||45.3;
+  s.carKmpl=parseFloat(document.getElementById('set-car-kmpl').value)||23.6;
+  s.deliveryKm=parseFloat(document.getElementById('set-delivery-km').value)||4;
+  s.carThreshold=parseInt(document.getElementById('set-car-threshold').value)||14;
+  s.deliveryStart=document.getElementById('set-delivery-start').value||'2026-05-23';
+  saveState();showNotif('บันทึกค่าขนส่งแล้ว ✅');
+}
+
+// คำนวณค่าน้ำมันต่อรอบส่ง
+function calcDeliveryCost(orderCount){
+  const s=S.settings;
+  const km=s.deliveryKm||4;
+  if(orderCount>=(s.carThreshold||14)){
+    const costPerTrip=round2((km/(s.carKmpl||23.6))*(s.fuel95||44.05));
+    return{costPerTrip,vehicle:'🚗 รถยนต์',costPerOrder:round2(costPerTrip/orderCount)};
+  } else {
+    const costPerTrip=round2((km/(s.motoKmpl||45.3))*(s.fuel91||43.68));
+    return{costPerTrip,vehicle:'🛵 Scoopy',costPerOrder:round2(costPerTrip/orderCount)};
+  }
+}
+
+// คำนวณและ assign ค่าขนส่งให้ออเดอร์ใน batch โดยใช้ Shipped Time ± 60 นาที
+function calcDeliveryForOrders(orders){
+  const s=S.settings;
+  const startDate=new Date(s.deliveryStart||'2026-05-23');
+  const ROUND_GAP=60*60*1000; // 60 นาที
+
+  // กรองเฉพาะออเดอร์ที่มี shippedDate และหลัง startDate
+  const eligible=orders.filter(o=>{
+    if(!o.shippedDate)return false;
+    const d=parseDate(o.shippedDate);
+    return d>=startDate;
+  });
+
+  if(!eligible.length)return;
+
+  // Sort by shipped datetime
+  eligible.sort((a,b)=>{
+    const da=new Date(a.shippedDate.includes('/')?a.shippedDate.split('/').reverse().join('-'):a.shippedDate);
+    const db=new Date(b.shippedDate.includes('/')?b.shippedDate.split('/').reverse().join('-'):b.shippedDate);
+    return da-db;
+  });
+
+  // Group by round: ถ้า shippedDate ต่างกัน <= 60 นาที = รอบเดียวกัน
+  const rounds=[];
+  let current=[];
+  eligible.forEach(o=>{
+    const dt=new Date(o.shippedDate.includes('/')?o.shippedDate.split('/').reverse().join('-'):o.shippedDate);
+    if(!current.length){
+      current.push({o,dt});
+    } else {
+      const lastDt=current[current.length-1].dt;
+      if(dt-lastDt<=ROUND_GAP){
+        current.push({o,dt});
+      } else {
+        rounds.push(current);
+        current=[{o,dt}];
+      }
+    }
+  });
+  if(current.length)rounds.push(current);
+
+  // คำนวณค่าส่งต่อรอบ
+  rounds.forEach(rnd=>{
+    const count=rnd.length;
+    const{costPerOrder}=calcDeliveryCost(count);
+    rnd.forEach(({o})=>{
+      o.deliveryCost=costPerOrder;
+      o.totalCost=round2(o.productCost+o.packCost+o.tiktokFee+costPerOrder);
+      o.profit=round2(o.revenue-o.totalCost);
+    });
+  });
+}
+
+// Recalculate delivery costs for all existing orders
+function recalcDeliveryCosts(){
+  calcDeliveryForOrders(S.orders);
+  saveState();
+}
+
+// ===================== BOX FIFO =====================
+const BOX_FIFO_START = new Date('2026-05-23T15:00:00');
+const BOX_INITIAL_LOTS = [
+  {id:'box-init-AB-1',type:'AB',date:'2026-05-23',qty:68,usedQty:0,pricePerBox:2.35,isInit:true},
+  {id:'box-init-B-1', type:'B', date:'2026-05-23',qty:4, usedQty:0,pricePerBox:2.95,isInit:true},
+  {id:'box-init-B-2', type:'B', date:'2026-05-23',qty:60,usedQty:0,pricePerBox:3.30,isInit:true},
+];
+
+function initBoxLots(){
+  if(!S.boxLots) S.boxLots=JSON.parse(JSON.stringify(BOX_INITIAL_LOTS));
+}
+
+function getBoxStock(type){
+  return (S.boxLots||[]).filter(l=>l.type===type).reduce((s,l)=>s+l.qty-(l.usedQty||0),0);
+}
+
+function getFifoBoxCost(type){
+  // หา Lot ที่ยังมีของเหลือก่อน
+  const lots=(S.boxLots||[]).filter(l=>l.type===type&&(l.qty-(l.usedQty||0))>0).sort((a,b)=>a.date.localeCompare(b.date));
+  if(lots.length>0)return lots[0].pricePerBox;
+  // fallback: ใช้ราคา Lot ล่าสุดถึงแม้จะหมดแล้ว
+  const allLots=(S.boxLots||[]).filter(l=>l.type===type).sort((a,b)=>b.date.localeCompare(a.date));
+  return allLots.length>0?allLots[0].pricePerBox:0;
+}
+
+function deductBoxFifo(type,qty){
+  const lots=(S.boxLots||[]).filter(l=>l.type===type&&(l.qty-(l.usedQty||0))>0).sort((a,b)=>a.date.localeCompare(b.date));
+  let rem=qty;
+  for(const l of lots){if(rem<=0)break;const take=Math.min(l.qty-(l.usedQty||0),rem);l.usedQty=round2((l.usedQty||0)+take);rem-=take;}
+}
+
+// คำนวณค่าแพ็คจาก FIFO กล่อง (ใช้หลัง BOX_FIFO_START)
+function getPackCostFifo(totalQty, hasCorn6, orderDate){
+  const od = orderDate ? new Date(orderDate.includes('/')?orderDate.split('/').reverse().join('-'):orderDate) : new Date();
+  if(od < BOX_FIFO_START){
+    // ก่อน FIFO start → ใช้ settings เดิม
+    return getPackCost(totalQty, hasCorn6);
+  }
+  // หลัง FIFO start → ดึงราคาจาก FIFO lots
+  const useB = hasCorn6 || totalQty >= 5;
+  const useAB = !useB && totalQty >= 3;
+  const bubbleCost = 0.50; // ค่าบับเบิ้ลคงที่
+  const stickerPerBag = S.settings.sticker || 0;
+  if(useB){
+    const boxCost = getFifoBoxCost('B');
+    return round2(boxCost + bubbleCost + stickerPerBag * totalQty);
+  } else if(useAB){
+    const boxCost = getFifoBoxCost('AB');
+    return round2(boxCost + bubbleCost + stickerPerBag * totalQty);
+  } else {
+    // 1-2 ถุง ใช้แค่บับเบิ้ล
+    return round2(bubbleCost + stickerPerBag * totalQty);
+  }
+}
+
+function saveBoxLot(){
+  const type=document.getElementById('box-type').value;
+  const date=document.getElementById('box-date').value;
+  const qty=parseInt(document.getElementById('box-qty').value)||0;
+  const price=parseFloat(document.getElementById('box-price').value)||0;
+  if(!date||qty<=0||price<=0){showNotif('กรุณากรอกข้อมูลให้ครบ','error');return;}
+  if(!S.boxLots)S.boxLots=[];
+  S.boxLots.push({id:'box-'+Date.now(),type,date,qty,usedQty:0,pricePerBox:price,isInit:false});
+  saveState();renderBoxStock();renderBoxLots();
+  document.getElementById('box-qty').value='';
+  document.getElementById('box-price').value='';
+  showNotif(`บันทึก กล่อง ${type} ${qty} ใบ ฿${price}/ใบ ✅`);
+}
+
+function renderBoxStock(){
+  const g=document.getElementById('box-stock-grid');if(!g)return;
+  const types=[{id:'AB',label:'กล่อง AB',icon:'📦',desc:'3-4 ถุง'},{id:'B',label:'กล่อง B',icon:'📫',desc:'5+ ถุง'}];
+  g.innerHTML=types.map(t=>{
+    const qty=getBoxStock(t.id);
+    const cpb=getFifoBoxCost(t.id);
+    const pct=Math.min((qty/100)*100,100);
+    const cls=qty<=5?'stock-low':qty<=20?'stock-med':'';
+    return `<div class="prod-card ${cls}">
+      <div class="pc-icon">${t.icon}</div>
+      <div class="pc-name">${t.label}</div>
+      <div class="pc-stock">${qty} ใบเหลือ</div>
+      <div class="pc-cost">${cpb>0?'฿'+cpb.toFixed(2)+'/ใบ (FIFO)':'ไม่มีสต็อก'}</div>
+      <div class="stock-bar ${cls}"><div class="stock-fill" style="width:${pct}%"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function renderBoxLots(){
+  const tbody=document.getElementById('box-lots-tbody');if(!tbody)return;
+  const lots=(S.boxLots||[]).slice().sort((a,b)=>b.date.localeCompare(a.date));
+  if(!lots.length){tbody.innerHTML='<tr><td colspan="7"><div class="empty"><div class="ei">📦</div><p>ยังไม่มีข้อมูล</p></div></td></tr>';return;}
+  tbody.innerHTML=lots.map(l=>`<tr style="${l.isInit?'background:rgba(245,166,35,.05)':''}">
+    <td>${l.date}${l.isInit?' <span style="font-size:.7rem;background:var(--accent-light);color:var(--accent);padding:1px 5px;border-radius:4px">ตั้งต้น</span>':''}</td>
+    <td><b>${l.type==='AB'?'📦 กล่อง AB':'📫 กล่อง B'}</b></td>
+    <td class="text-right">${l.qty}</td>
+    <td class="text-right">${l.usedQty||0}</td>
+    <td class="text-right"><b>${l.qty-(l.usedQty||0)}</b></td>
+    <td class="text-right" style="color:var(--accent);font-family:'IBM Plex Mono',monospace">฿${l.pricePerBox.toFixed(2)}</td>
+    <td>${!l.isInit?`<button class="btn btn-danger" onclick="deleteBoxLot('${l.id}')">ลบ</button>`:''}</td>
+  </tr>`).join('');
+}
+
+function deleteBoxLot(id){
+  if(!confirm('ลบ Lot กล่องนี้?'))return;
+  S.boxLots=(S.boxLots||[]).filter(l=>l.id!==id);
+  saveState();renderBoxStock();renderBoxLots();
+}
+
+function saveStickerSettings(){
+  S.settings.sticker=parseFloat(document.getElementById('set-sticker').value)||0;
+  saveState();showNotif('บันทึกราคาสติ๊กเกอร์แล้ว ✅');
+}
+
+// ===================== SETTINGS =====================
+function renderSettings(){
+  const s=S.settings;
+  document.getElementById('set-bag1217').value=s.bag1217??0.66;document.getElementById('set-bag1220').value=s.bag1220??0.84;
+  document.getElementById('set-bag1522').value=s.bag1522??1.10;document.getElementById('set-kanchuean').value=s.kanchuean??0.50;
+  document.getElementById('set-pack1').value=s.pack1;document.getElementById('set-pack2').value=s.pack2;document.getElementById('set-pack3').value=s.pack3;
+  document.getElementById('set-elec').value=s.elec;
+  document.getElementById('set-sticker').value=s.sticker??0.181;
+  document.getElementById('set-fuel91').value=s.fuel91??43.68;
+  document.getElementById('set-fuel95').value=s.fuel95??44.05;
+  document.getElementById('set-moto-kmpl').value=s.motoKmpl??45.3;
+  document.getElementById('set-car-kmpl').value=s.carKmpl??23.6;
+  document.getElementById('set-delivery-km').value=s.deliveryKm??4;
+  document.getElementById('set-car-threshold').value=s.carThreshold??14;
+  document.getElementById('set-delivery-start').value=s.deliveryStart??'2026-05-23';
+}
+function saveBagSettings(){const s=S.settings;s.bag1217=parseFloat(document.getElementById('set-bag1217').value)||0;s.bag1220=parseFloat(document.getElementById('set-bag1220').value)||0;s.bag1522=parseFloat(document.getElementById('set-bag1522').value)||0;s.kanchuean=parseFloat(document.getElementById('set-kanchuean').value)||0;saveState();showNotif('บันทึกแล้ว ✅');}
+function savePackSettings(){const s=S.settings;s.pack1=parseFloat(document.getElementById('set-pack1').value)||1.30;s.pack2=parseFloat(document.getElementById('set-pack2').value)||2.35;s.pack3=parseFloat(document.getElementById('set-pack3').value)||2.95;saveState();showNotif('บันทึกแล้ว ✅');}
+function saveElecSettings(){S.settings.elec=parseFloat(document.getElementById('set-elec').value)||5;saveState();showNotif('บันทึกแล้ว ✅');}
+
+// ===================== BACKUP =====================
+function exportExcel(){
+  const wb = XLSX.utils.book_new();
+  const allOrders=[...S.orders,...(S.manualSales||[])];
+
+  // Sheet 1: สรุปรายเดือน
+  const monthMap={};
+  allOrders.forEach(o=>{
+    const d=o.date;if(!d)return;
+    const parts=d.split('/');
+    const key=parts.length===3?`${parts[2]}-${parts[1]}`:d.slice(0,7);
+    if(!monthMap[key])monthMap[key]={month:key,orders:0,revenue:0,productCost:0,packCost:0,fee:0,deliveryCost:0,profit:0};
+    const m=monthMap[key];
+    m.orders++;m.revenue+=o.revenue;m.productCost+=o.productCost||0;
+    m.packCost+=o.packCost||0;m.fee+=o.tiktokFee||0;
+    m.deliveryCost+=(o.deliveryCost||0)+(o.shippingCost||0);m.profit+=o.profit;
+  });
+  const monthRows=[['เดือน','ออเดอร์','รายได้','ต้นทุนสินค้า','ค่าแพ็ค','TikTok Fee','ค่าขนส่ง','กำไร','Margin%']];
+  Object.values(monthMap).sort((a,b)=>a.month.localeCompare(b.month)).forEach(m=>{
+    const margin=m.revenue>0?round2(m.profit/m.revenue*100):0;
+    monthRows.push([m.month,m.orders,round2(m.revenue),round2(m.productCost),round2(m.packCost),round2(m.fee),round2(m.deliveryCost),round2(m.profit),margin+'%']);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(monthRows), 'สรุปรายเดือน');
+
+  // Sheet 2: กำไรต่อชนิด
+  const pd={};
+  allOrders.forEach(o=>o.items.forEach(item=>{
+    if(!pd[item.name])pd[item.name]={name:item.name,qty:0,revenue:0,productCost:0,profit:0};
+    const ratio=o.totalQty>0?item.qty/o.totalQty:0;
+    pd[item.name].qty+=item.qty;
+    pd[item.name].revenue+=o.revenue*ratio;
+    pd[item.name].productCost+=getFifoCost(item.name)*item.qty;
+    pd[item.name].profit+=o.profit*ratio;
+  }));
+  const prodRows=[['ชนิด','ถุงที่ขาย','รายได้','ต้นทุน','กำไร','กำไร/ถุง','Margin%','อันดับ']];
+  Object.values(pd).sort((a,b)=>b.profit-a.profit).forEach((d,i)=>{
+    const margin=d.revenue>0?round2(d.profit/d.revenue*100):0;
+    const ppb=d.qty>0?round2(d.profit/d.qty):0;
+    prodRows.push([d.name,d.qty,round2(d.revenue),round2(d.productCost),round2(d.profit),ppb,margin+'%',i+1]);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(prodRows), 'กำไรต่อชนิด');
+
+  // Sheet 3: รายออเดอร์ทั้งหมด
+  const orderRows=[['วันที่','Order ID','ช่องทาง','สถานะ','สินค้า','ซอง','รายได้','ต้นทุน','ค่าแพ็ค','Fee','ค่าขนส่ง','กำไร','Margin%']];
+  allOrders.sort((a,b)=>parseOrderDate(a.date)-parseOrderDate(b.date)).forEach(o=>{
+    const ch=o.source==='manual'?o.platform:'TikTok';
+    const items=o.items.map(i=>`${i.name}×${i.qty}`).join(', ');
+    const margin=o.revenue>0?round2(o.profit/o.revenue*100):0;
+    orderRows.push([o.date,o.id||'',ch,o.status,items,o.totalQty,o.revenue,o.productCost||0,o.packCost||0,o.tiktokFee||0,(o.deliveryCost||0)+(o.shippingCost||0),o.profit,margin+'%']);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(orderRows), 'รายออเดอร์');
+
+  // Sheet 4: สต็อกปัจจุบัน
+  const stockRows=[['ชนิด','คงเหลือ (ถุง)','ต้นทุน FIFO/ถุง','มูลค่าสต็อก']];
+  Object.entries(S.stock).forEach(([name,qty])=>{
+    const cpb=getFifoCost(name);
+    stockRows.push([name,qty,cpb,round2(qty*cpb)]);
+  });
+  stockRows.push(['','','รวมมูลค่าสต็อก',round2(Object.entries(S.stock).reduce((s,[n,q])=>s+q*getFifoCost(n),0))]);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(stockRows), 'สต็อกปัจจุบัน');
+
+  const date=new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `บ้านเจ้าหนู_report_${date}.xlsx`);
+  showNotif('ดาวน์โหลด Report.xlsx แล้ว ✅');
+}
+
+function exportData(){
+  const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='hamster_snack_backup_'+new Date().toISOString().slice(0,10)+'.json';a.click();
+  showNotif('ดาวน์โหลด backup แล้ว ✅');
+}
+function importData(inp){
+  if(!inp.files[0])return;if(!confirm('⚠️ จะแทนที่ข้อมูลทั้งหมด ยืนยัน?'))return;
+  const r=new FileReader();
+  r.onload=e=>{
+    try{S=JSON.parse(e.target.result);fixAndRecalc();saveState();
+      showNotif('Import สำเร็จ ✅');renderDryStock();renderFreshList();renderFreshStockGrid();renderOverview();
+    }catch(err){showNotif('ไฟล์ไม่ถูกต้อง','error');}
+  };r.readAsText(inp.files[0]);
+}
+function clearAllData(){if(!confirm('⚠️ ล้างข้อมูลทั้งหมด?'))return;localStorage.removeItem('hamsterSnackV3');location.reload();}
+
+// ===================== DELIVERY ROUNDS =====================
+function renderDeliveryRoundPicker(){
+  const date = document.getElementById('dr-date').value;
+  const picker = document.getElementById('dr-order-picker');
+  const preview = document.getElementById('dr-preview');
+  if(!date){picker.innerHTML='<div style="color:var(--text2);font-size:.83rem">เลือกวันที่ก่อนค่ะ</div>';preview.style.display='none';return;}
+
+  // หา order IDs ที่มีรอบส่งแล้ว (ยกเว้นรอบที่กำลังแก้ไข)
+  const assignedIds = new Set((S.deliveryRounds||[]).flatMap(r=>r.orderIds));
+
+  // หาออเดอร์ TikTok วันนั้น (จัดส่งแล้ว + ที่จะจัดส่ง + เสร็จสมบูรณ์) ที่ยังไม่มีรอบส่ง
+  const ttOrders = S.orders.filter(o=>{
+    const od = o.shippedDate || o.date;
+    const odParsed = parseOrderDate(od);
+    const dateParsed = new Date(date);
+    return odParsed.toDateString()===dateParsed.toDateString() &&
+      ['จัดส่งแล้ว','ที่จะจัดส่ง','เสร็จสมบูรณ์'].includes(o.status) &&
+      !assignedIds.has(o.id);
+  });
+
+  // หาออเดอร์ Manual วันนั้น ที่ยังไม่มีรอบส่ง
+  const manOrders = (S.manualSales||[]).filter(o=>
+    parseOrderDate(o.date).toDateString()===new Date(date).toDateString() &&
+    !assignedIds.has(o.id)
+  );
+
+  // เช็คว่าวันนี้มีรอบส่งแล้วกี่รอบ
+  const roundsToday = (S.deliveryRounds||[]).filter(r=>r.date===date);
+  if(roundsToday.length>=2){
+    picker.innerHTML='<div style="color:var(--red);font-size:.83rem;padding:8px">⚠️ วันนี้มีรอบส่งครบ 2 รอบแล้ว</div>';
+    preview.style.display='none';return;
+  }
+
+  const allSelectable = [
+    ...ttOrders.map(o=>({id:o.id, label:`TikTok ${o.id.slice(-8)} | ${o.items.map(i=>`${i.name}×${i.qty}`).join(', ')}`, source:'tiktok'})),
+    ...manOrders.map(o=>({id:o.id, label:`${o.platform} | ${o.items.map(i=>`${i.name}×${i.qty}`).join(', ')}`, source:'manual'}))
+  ];
+
+  if(!allSelectable.length){
+    picker.innerHTML='<div style="color:var(--text2);font-size:.83rem">ไม่มีออเดอร์วันนี้</div>';
+    preview.style.display='none';return;
+  }
+
+  picker.innerHTML = allSelectable.map(o=>`
+    <label style="display:flex;gap:10px;align-items:center;padding:7px 6px;border-radius:6px;cursor:pointer;font-size:.83rem;border-bottom:1px solid var(--border)" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+      <input type="checkbox" value="${o.id}" data-source="${o.source}" onchange="updateDRPreview()" style="width:16px;height:16px;accent-color:var(--accent)">
+      <span>${o.source==='tiktok'?'🛒':'🏪'} ${o.label}</span>
+    </label>`).join('');
+  preview.style.display='none';
+}
+
+function updateDRPreview(){
+  const checked = document.querySelectorAll('#dr-order-picker input:checked');
+  const div = document.getElementById('dr-preview');
+  if(!checked.length){div.style.display='none';return;}
+  const count = checked.length;
+  const{costPerTrip,vehicle,costPerOrder}=calcDeliveryCost(count);
+  div.innerHTML=`${vehicle} | ค่าน้ำมัน ฿${costPerTrip.toFixed(2)} ÷ ${count} ออเดอร์ = <b style="color:var(--accent)">฿${costPerOrder.toFixed(2)}/ออเดอร์</b>`;
+  div.style.display='';
+}
+
+function saveDeliveryRound(){
+  const date = document.getElementById('dr-date').value;
+  const round = document.getElementById('dr-round').value;
+  const checked = document.querySelectorAll('#dr-order-picker input:checked');
+  if(!date||!checked.length){showNotif('กรุณาเลือกวันที่และออเดอร์','error');return;}
+
+  const orderIds = [...checked].map(c=>({id:c.value, source:c.dataset.source}));
+  const count = orderIds.length;
+  const{costPerTrip,vehicle,costPerOrder}=calcDeliveryCost(count);
+
+  // อัพเดท deliveryCost ของแต่ละออเดอร์
+  orderIds.forEach(({id,source})=>{
+    if(source==='tiktok'){
+      const o=S.orders.find(x=>x.id===id);
+      if(o){o.deliveryCost=costPerOrder;o.totalCost=round2(o.productCost+o.packCost+o.tiktokFee+costPerOrder);o.profit=round2(o.revenue-o.totalCost);}
+    } else {
+      const o=(S.manualSales||[]).find(x=>x.id===id);
+      if(o){o.deliveryCost=costPerOrder;o.totalCost=round2(o.productCost+o.packCost+o.tiktokFee+(o.shippingCost||0)+costPerOrder);o.profit=round2(o.revenue-o.totalCost);}
+    }
+  });
+
+  // บันทึกรอบส่ง
+  if(!S.deliveryRounds)S.deliveryRounds=[];
+  S.deliveryRounds.push({
+    id:'dr-'+Date.now(), date, round, vehicle,
+    costPerTrip, costPerOrder, count,
+    orderIds: orderIds.map(o=>o.id)
+  });
+
+  saveState();renderDeliveryRounds();renderOverview();
+  // reset
+  document.getElementById('dr-date').value='';
+  document.getElementById('dr-order-picker').innerHTML='<div style="color:var(--text2);font-size:.83rem">เลือกวันที่ก่อนค่ะ</div>';
+  document.getElementById('dr-preview').style.display='none';
+  showNotif(`บันทึกรอบส่ง ${round} ${count} ออเดอร์ ค่าน้ำมัน ฿${costPerTrip.toFixed(2)} ✅`);
+}
+
+function renderDeliveryRounds(){
+  const tbody=document.getElementById('dr-tbody');if(!tbody)return;
+  const rounds=(S.deliveryRounds||[]).slice().reverse();
+  if(!rounds.length){tbody.innerHTML='<tr><td colspan="7"><div class="empty"><div class="ei">🚚</div><p>ยังไม่มีข้อมูล</p></div></td></tr>';return;}
+  tbody.innerHTML=rounds.map(r=>`<tr>
+    <td>${r.date}</td>
+    <td>${r.round==='เช้า'?'🌅 เช้า':'🌞 บ่าย'}</td>
+    <td style="font-size:.78rem;color:var(--text2)">${r.orderIds.map(id=>id.slice(-6)).join(', ')}</td>
+    <td class="text-right">${r.vehicle}</td>
+    <td class="text-right">฿${r.costPerTrip.toFixed(2)}</td>
+    <td class="text-right" style="color:var(--accent)">฿${r.costPerOrder.toFixed(2)}</td>
+    <td><button class="btn btn-danger" onclick="deleteDeliveryRound('${r.id}')">ลบ</button></td>
+  </tr>`).join('');
+}
+
+function deleteDeliveryRound(id){
+  if(!confirm('ลบรอบส่งนี้? ค่าน้ำมันของออเดอร์ที่เกี่ยวข้องจะถูก reset'))return;
+  const round=(S.deliveryRounds||[]).find(r=>r.id===id);
+  if(round){
+    round.orderIds.forEach(oid=>{
+      const o=S.orders.find(x=>x.id===oid);
+      if(o){o.deliveryCost=0;o.totalCost=round2(o.productCost+o.packCost+o.tiktokFee);o.profit=round2(o.revenue-o.totalCost);}
+      const m=(S.manualSales||[]).find(x=>x.id===oid);
+      if(m){m.deliveryCost=0;m.totalCost=round2(m.productCost+m.packCost+m.tiktokFee+(m.shippingCost||0));m.profit=round2(m.revenue-m.totalCost);}
+    });
+  }
+  S.deliveryRounds=(S.deliveryRounds||[]).filter(r=>r.id!==id);
+  saveState();renderDeliveryRounds();renderOverview();
+  showNotif('ลบรอบส่งแล้ว ✅');
+}
+
+// ===================== MANUAL SALE =====================
+let manualItems=[];
+
+function addManualItem(){
+  const id=Date.now()+Math.floor(Math.random()*9999);
+  manualItems.push({id,name:'',qty:1});
+  renderManualItems();
+}
+
+function removeManualItem(id){manualItems=manualItems.filter(i=>i.id!==id);renderManualItems();}
+
+function updateManualItem(id,field,val){
+  const item=manualItems.find(i=>i.id===id);if(!item)return;
+  item[field]=field==='qty'?(parseInt(val)||1):val;
+}
+
+function renderManualItems(){
+  const c=document.getElementById('m-items');if(!c)return;
+  const opts=Object.keys(PRODUCT_ICONS);
+  c.innerHTML=manualItems.map(item=>`
+    <div style="display:grid;grid-template-columns:2fr 1fr auto;gap:8px;margin-bottom:8px;align-items:end">
+      <div class="form-group" style="margin-bottom:0"><label style="font-size:.75rem">ชนิด</label>
+        <select onchange="updateManualItem(${item.id},'name',this.value)">
+          <option value="">-- เลือก --</option>
+          ${opts.map(n=>`<option ${n===item.name?'selected':''}>${n}</option>`).join('')}
+        </select></div>
+      <div class="form-group" style="margin-bottom:0"><label style="font-size:.75rem">จำนวนซอง</label>
+        <input type="number" value="${item.qty}" min="1" step="1" oninput="updateManualItem(${item.id},'qty',this.value)"></div>
+      <button class="btn btn-danger" onclick="removeManualItem(${item.id})" style="margin-bottom:1px">✕</button>
+    </div>`).join('');
+}
+
+function getManualCalc(){
+  const revenue=parseFloat(document.getElementById('m-revenue').value)||0;
+  const feePct=parseFloat(document.getElementById('m-fee-pct').value)||0;
+  const shipping=parseFloat(document.getElementById('m-shipping').value)||0;
+  const validItems=manualItems.filter(i=>i.name&&i.qty>0);
+  const totalQty=validItems.reduce((s,i)=>s+i.qty,0);
+  const hasCorn6=validItems.some(i=>i.name==='ข้าวโพด 6 แว่น');
+  const productCost=round2(validItems.reduce((s,i)=>s+getFifoCost(i.name)*i.qty,0));
+  const packCost=getPackCostFifo(totalQty,hasCorn6,document.getElementById('m-date').value);
+  const feeAmt=round2(revenue*feePct/100);
+  const totalCost=round2(productCost+packCost+feeAmt+shipping);
+  const profit=round2(revenue-totalCost);
+  const margin=revenue>0?round2(profit/revenue*100):0;
+  return{revenue,feePct,feeAmt,shipping,productCost,packCost,totalCost,profit,margin,totalQty,validItems,hasCorn6};
+}
+
+function calcManual(){
+  if(!manualItems.length){showNotif('กรุณาเพิ่มสินค้าก่อน','error');return;}
+  const c=getManualCalc();
+  const div=document.getElementById('m-preview');
+  div.innerHTML=`
+    <div style="display:flex;gap:16px;flex-wrap:wrap">
+      <span>ต้นทุนสินค้า: <b>฿${c.productCost.toFixed(2)}</b></span>
+      <span>ค่าแพ็ค: <b>฿${c.packCost.toFixed(2)}</b></span>
+      <span>ค่าบริการ (${c.feePct}%): <b>฿${c.feeAmt.toFixed(2)}</b></span>
+      <span>ค่าส่ง: <b>฿${c.shipping.toFixed(2)}</b></span>
+    </div>
+    <div style="margin-top:8px;font-size:.95rem">
+      รายได้ ฿${c.revenue.toFixed(2)} − ต้นทุนรวม ฿${c.totalCost.toFixed(2)} = 
+      <b style="color:${c.profit>=0?'var(--green)':'var(--red)'}">กำไร ฿${c.profit.toFixed(2)} (${c.margin.toFixed(1)}%)</b>
+    </div>`;
+  div.style.display='';
+  return c;
+}
+
+function saveManualSale(){
+  const c=calcManual();if(!c)return;
+  const date=document.getElementById('m-date').value;
+  const platformSel=document.getElementById('m-platform').value;
+  const platformCustom=document.getElementById('m-platform-custom').value.trim();
+  const platform=platformSel==='อื่นๆ'&&platformCustom?platformCustom:platformSel;
+  if(!date||c.validItems.length===0||c.revenue<=0){showNotif('กรุณากรอกข้อมูลให้ครบ','error');return;}
+
+  const sale={
+    id:'manual-'+Date.now(),date,platform,source:'manual',
+    items:c.validItems.map(i=>({name:i.name,qty:i.qty,costPerBag:getFifoCost(i.name)})),
+    totalQty:c.totalQty,hasCorn6:c.hasCorn6,
+    revenue:c.revenue,productCost:c.productCost,packCost:c.packCost,
+    tiktokFee:c.feeAmt,feePct:c.feePct,shippingCost:c.shipping,
+    totalCost:c.totalCost,profit:c.profit,status:'เสร็จสมบูรณ์'
+  };
+
+  if(!S.manualSales)S.manualSales=[];
+  S.manualSales.push(sale);
+  // ✅ ตัดสต็อกถุงอบแห้ง FIFO
+  c.validItems.forEach(i=>{
+    if(S.stock[i.name]!==undefined)
+      S.stock[i.name]=Math.max(0,S.stock[i.name]-i.qty);
+  });
+  // ✅ ตัดกล่อง FIFO หลัง BOX_FIFO_START
+  const od=new Date(date.includes('/')?date.split('/').reverse().join('-'):date);
+  if(od>=BOX_FIFO_START&&c.totalQty>0){
+    const useB=c.hasCorn6||c.totalQty>=5;
+    const useAB=!useB&&c.totalQty>=3;
+    if(useB)deductBoxFifo('B',1);
+    else if(useAB)deductBoxFifo('AB',1);
+  }
+  recalcAllFifo();saveState();renderManualList();renderDryStock();renderBoxStock();renderOverview();
+
+  // reset form
+  manualItems=[];
+  document.getElementById('m-items').innerHTML='';
+  document.getElementById('m-revenue').value='';
+  document.getElementById('m-fee-pct').value='0';
+  document.getElementById('m-shipping').value='0';
+  document.getElementById('m-platform-custom').value='';
+  document.getElementById('m-preview').style.display='none';
+  showNotif(`บันทึกการขาย ${platform} แล้ว ✅`);
+}
+
+function renderManualList(){
+  const tbody=document.getElementById('manual-tbody');if(!tbody)return;
+  const filter=document.getElementById('m-filter-platform')?.value||'';
+  const list=(S.manualSales||[]).filter(s=>!filter||s.platform===filter).slice().reverse();
+  if(!list.length){tbody.innerHTML='<tr><td colspan="10"><div class="empty"><div class="ei">📝</div><p>ยังไม่มีข้อมูล</p></div></td></tr>';return;}
+  tbody.innerHTML=list.map(s=>`<tr>
+    <td>${s.date}</td>
+    <td><span class="badge badge-pend">${s.platform}</span></td>
+    <td style="font-size:.78rem;max-width:180px;white-space:normal">${s.items.map(i=>`${PRODUCT_ICONS[i.name]||''}${i.name}×${i.qty}`).join(', ')}</td>
+    <td class="text-right">฿${s.revenue.toFixed(2)}</td>
+    <td class="text-right">฿${s.productCost.toFixed(2)}</td>
+    <td class="text-right">฿${s.packCost.toFixed(2)}</td>
+    <td class="text-right">฿${s.tiktokFee.toFixed(2)}</td>
+    <td class="text-right ${s.profit>=0?'profit-pos':'profit-neg'}">฿${s.profit.toFixed(2)}</td>
+    <td class="text-right">${s.revenue>0?(s.profit/s.revenue*100).toFixed(1):0}%</td>
+    <td><button class="btn btn-danger" onclick="deleteManualSale('${s.id}')">ลบ</button></td>
+  </tr>`).join('');
+}
+
+function deleteManualSale(id){
+  if(!confirm('ลบรายการนี้?'))return;
+  const sale=(S.manualSales||[]).find(s=>s.id===id);
+  if(sale){
+    // ✅ คืนสต็อกถุงอบแห้ง
+    sale.items.forEach(i=>{if(S.stock[i.name]!==undefined)S.stock[i.name]=(S.stock[i.name]||0)+i.qty;});
+    // ✅ คืนกล่อง FIFO
+    const od=new Date(sale.date.includes('/')?sale.date.split('/').reverse().join('-'):sale.date);
+    if(od>=BOX_FIFO_START&&sale.totalQty>0){
+      const useB=sale.hasCorn6||sale.totalQty>=5;
+      const useAB=!useB&&sale.totalQty>=3;
+      const type=useB?'B':useAB?'AB':null;
+      if(type){
+        const lot=(S.boxLots||[]).filter(l=>l.type===type&&(l.usedQty||0)>0).sort((a,b)=>b.date.localeCompare(a.date))[0];
+        if(lot)lot.usedQty=Math.max(0,(lot.usedQty||0)-1);
+      }
+    }
+  }
+  S.manualSales=(S.manualSales||[]).filter(s=>s.id!==id);
+  recalcAllFifo();saveState();renderManualList();renderDryStock();renderBoxStock();renderOverview();
+  showNotif('ลบแล้ว สต็อกปรับกลับแล้ว ✅');
+}
+
+function adjustDryStock(){
+  const name=document.getElementById('da-name').value;
+  const qty=parseInt(document.getElementById('da-qty').value)||0;
+  const reason=document.getElementById('da-reason').value;
+  const note=document.getElementById('da-note').value;
+  if(!name||qty<=0){showNotif('กรุณากรอกข้อมูลให้ครบ','error');return;}
+  const avail=S.stock[name]||0;
+  if(qty>avail){showNotif(`สต็อก${name}เหลือแค่ ${avail} ถุง`,'error');return;}
+
+  // คำนวณต้นทุนตาม FIFO
+  const cpb=getFifoCost(name);
+  const totalCost=round2(cpb*qty);
+
+  // ตัด soldBags ใน Lot แบบ FIFO
+  const lots=S.dryLots.filter(l=>l.name===name&&(l.totalBags-l.soldBags)>0).sort(lotSort);
+  let rem=qty;
+  for(const lot of lots){
+    if(rem<=0)break;
+    const take=Math.min(lot.totalBags-lot.soldBags,rem);
+    lot.soldBags+=take;
+    rem-=take;
+  }
+
+  // อัพเดทสต็อก
+  S.stock[name]=Math.max(0,avail-qty);
+
+  // บันทึกเป็น Lot พิเศษแสดงในประวัติ
+  if(!S.dryAdjustments)S.dryAdjustments=[];
+  S.dryAdjustments.push({
+    id:'da-'+Date.now(),
+    date:new Date().toISOString().slice(0,10),
+    name,qty,reason,note,cpb,totalCost
+  });
+
+  recalcAllFifo();
+  saveState();renderDryStock();renderDryLots();renderOverview();
+  document.getElementById('da-name').value='';
+  document.getElementById('da-qty').value='';
+  document.getElementById('da-note').value='';
+  showNotif(`ปรับลด ${name} -${qty} ถุง (${reason}) ฿${totalCost.toFixed(2)} ✅`);
+}
+
+// ===================== NAV & UI =====================
+function toggleDarkMode(){
+  const isDark=document.documentElement.getAttribute('data-theme')==='dark';
+  document.documentElement.setAttribute('data-theme',isDark?'light':'dark');
+  const btn=document.getElementById('dark-btn');
+  if(btn)btn.textContent=isDark?'🌙 Dark':'☀️ Light';
+  localStorage.setItem('hamsterTheme',isDark?'light':'dark');
+}
+
+function initTheme(){
+  const saved=localStorage.getItem('hamsterTheme')||'light';
+  document.documentElement.setAttribute('data-theme',saved);
+  const btn=document.getElementById('dark-btn');
+  if(btn)btn.textContent=saved==='dark'?'☀️ Light':'🌙 Dark';
+}
+
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  const pages=['p-stock','p-import','p-manual','p-profit','p-settings','p-backup'];
+  document.querySelectorAll('.nav-btn')[pages.indexOf(id)]?.classList.add('active');
+  if(id==='p-settings')renderSettings();
+  if(id==='p-profit')renderOverview();
+  if(id==='p-manual'){renderManualItems();renderManualList();renderDeliveryRounds();
+    document.getElementById('dr-date').value=new Date().toISOString().slice(0,10);
+    renderDeliveryRoundPicker();}
+  if(id==='p-stock'){renderFreshList();renderFreshStockGrid();renderDryStock();renderDryLots();initBoxLots();renderBoxStock();renderBoxLots();}
+}
+function showInnerStock(showId, btn){
+  ['stock-fresh','stock-dry','stock-box'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.style.display='none';
+  });
+  document.getElementById(showId).style.display='';
+  btn.closest('.inner-tabs').querySelectorAll('.inner-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if(showId==='stock-dry'){renderDryStock();renderDryLots();}
+  if(showId==='stock-fresh'){renderFreshList();renderFreshStockGrid();}
+  if(showId==='stock-box'){initBoxLots();renderBoxStock();renderBoxLots();}
+}
+
+function showInner(showId,hideId,btn){
+  document.getElementById(showId).style.display='';
+  document.getElementById(hideId).style.display='none';
+  btn.closest('.inner-tabs').querySelectorAll('.inner-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+}
+function statusBadge(s){return s==='เสร็จสมบูรณ์'?'badge-done':s==='จัดส่งแล้ว'?'badge-ship':'badge-pend';}
+function showNotif(msg,type='success'){
+  const el=document.createElement('div');el.className=`notif notif-${type}`;el.textContent=msg;
+  document.body.appendChild(el);setTimeout(()=>el.remove(),3000);
+}
+
+// ===================== INIT =====================
+window.addEventListener('load',function(){
+  // Register Service Worker for PWA
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('/BaanJaoNoo-Profit/sw.js')
+      .then(()=>console.log('SW registered'))
+      .catch(err=>console.log('SW error:',err));
+  }
+  initTheme();
+  loadState();
+  startFirebaseSync();
+  document.getElementById('f-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('m-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('d-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('box-date').value=new Date().toISOString().slice(0,10);
+  renderFreshList();
+  renderFreshStockGrid();
+  renderDryStock();
+  renderDryLots();
+  renderBoxStock();
+  renderBoxLots();
+  renderOverview();
+  // แจ้งเตือนสต็อกต่ำ
+  setTimeout(checkLowStock, 800);
+});
+
+function checkLowStock(){
+  const warnings=[];
+  // ถุงอบแห้ง < 5
+  Object.entries(S.stock).forEach(([name,qty])=>{
+    if(qty>0&&qty<5) warnings.push(`${PRODUCT_ICONS[name]||''} ${name}: เหลือ ${qty} ถุง`);
+  });
+  // กล่อง < 15
+  ['AB','B'].forEach(type=>{
+    const qty=getBoxStock(type);
+    if(qty<15) warnings.push(`📦 กล่อง ${type}: เหลือ ${qty} ใบ`);
+  });
+  if(warnings.length>0){
+    const msg=`⚠️ สต็อกใกล้หมด!\n${warnings.join('\n')}`;
+    const div=document.createElement('div');
+    div.style.cssText='position:fixed;top:70px;right:20px;z-index:9999;background:var(--surface);border:2px solid var(--yellow);border-radius:12px;padding:16px 20px;box-shadow:0 4px 20px rgba(0,0,0,.15);max-width:280px;font-size:.85rem;font-family:"Noto Sans Thai",sans-serif';
+    div.innerHTML=`<div style="font-weight:700;color:var(--yellow);margin-bottom:8px">⚠️ สต็อกใกล้หมด</div>`+
+      warnings.map(w=>`<div style="margin-bottom:4px">• ${w}</div>`).join('')+
+      `<button onclick="this.parentElement.remove()" style="margin-top:10px;background:none;border:1px solid var(--border);border-radius:6px;padding:4px 12px;cursor:pointer;font-family:inherit;font-size:.8rem">ปิด</button>`;
+    document.body.appendChild(div);
+  }
+}
+
+</script>
+</body>
+</html>

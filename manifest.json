@@ -1,0 +1,25 @@
+{
+  "name": "บ้านเจ้าหนู — ระบบวิเคราะห์กำไร",
+  "short_name": "บ้านเจ้าหนู",
+  "description": "ระบบวิเคราะห์กำไรสำหรับธุรกิจขนมแฮมสเตอร์",
+  "start_url": "/BaanJaoNoo-Profit/",
+  "scope": "/BaanJaoNoo-Profit/",
+  "display": "standalone",
+  "background_color": "#f7f5f0",
+  "theme_color": "#c8873a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
