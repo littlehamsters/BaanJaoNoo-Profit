@@ -477,14 +477,20 @@ async function saveToFirebase(){
 
 function startFirebaseSync(){
   updateSyncStatus('🔄 Connecting...','orange');
+  let firstSync=true;
   DATA_DOC.onSnapshot(snap=>{
     firebaseReady=true;
     if(!snap.exists)return;
     const data=snap.data();
-    if(!data)return;
+    if(!data){updateSyncStatus('✅ Synced','green');return;}
+
     const remoteTime=data.updatedAt?new Date(data.updatedAt):new Date(0);
     const localTime=S._updatedAt?new Date(S._updatedAt):new Date(0);
-    if(remoteTime>localTime){
+
+    // ครั้งแรกที่ sync: ดึงจาก Firebase เสมอถ้ามีข้อมูล
+    // ครั้งต่อไป: เช็ค timestamp
+    if(firstSync || remoteTime>localTime){
+      firstSync=false;
       isSyncing=true;
       const theme=localStorage.getItem('hamsterTheme');
       S={...data};
@@ -496,6 +502,7 @@ function startFirebaseSync(){
       renderAll();
       setTimeout(()=>{isSyncing=false;},500);
     }
+    firstSync=false;
     updateSyncStatus('✅ Synced','green');
   },err=>{
     console.error('Firebase listen error:',err);
