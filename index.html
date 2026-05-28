@@ -593,9 +593,9 @@ function recalcAllFifo(){
     const lots=S.dryLots.filter(l=>l.name===name).sort(lotSort);
     lots.forEach(l=>{l.soldBags=0;});
 
-    // ออเดอร์ที่ของออกจากบ้านแล้ว (จัดส่งแล้ว/เสร็จสมบูรณ์) — TikTok + manual
+    // ออเดอร์ขาย (TikTok + manual)
     const orders=[...S.orders,...(S.manualSales||[])]
-      .filter(o=>['เสร็จสมบูรณ์','จัดส่งแล้ว'].includes(o.status)&&o.items.some(i=>i.name===name))
+      .filter(o=>['เสร็จสมบูรณ์','จัดส่งแล้ว','ที่จะจัดส่ง'].includes(o.status)&&o.items.some(i=>i.name===name))
       .sort((a,b)=>parseDate(a.date)-parseDate(b.date));
     orders.forEach(o=>{
       const od=parseDate(o.date);
