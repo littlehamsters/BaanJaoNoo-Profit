@@ -14,8 +14,8 @@
 <meta name="apple-mobile-web-app-title" content="บ้านเจ้าหนู">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root{--bg:#f7f5f0;--surface:#fff;--surface2:#f0ede6;--border:#e2ddd4;--text:#2c2416;--text2:#7a6e5f;--accent:#c8873a;--accent-light:#f5dfc0;--green:#3a7c5c;--green-light:#c8eada;--red:#c0392b;--red-light:#fde8e6;--blue:#2d6fa4;--blue-light:#d6eaf8;--yellow:#d4a017;--shadow:0 2px 12px rgba(44,36,22,.08);--radius:12px}
@@ -446,6 +446,10 @@ const DATA_DOC = db.collection('hamster').doc('mainData');
 
 let isSyncing = false;
 let firebaseReady = false;
+let saveInFlight = false;
+let savePending = false;
+let saveRetryTimer = null;
+let saveRetryDelay = 1000;
 
 function updateSyncStatus(text, color){
   const el=document.getElementById('sync-status');
@@ -454,6 +458,9 @@ function updateSyncStatus(text, color){
 
 async function saveToFirebase(){
   if(!firebaseReady)return;
+  if(saveInFlight){savePending=true;return;}
+  saveInFlight=true;
+  if(saveRetryTimer){clearTimeout(saveRetryTimer);saveRetryTimer=null;}
   try{
     const data={
       orders:S.orders||[],freshPurchases:S.freshPurchases||[],
@@ -465,9 +472,17 @@ async function saveToFirebase(){
     };
     await DATA_DOC.set(data);
     updateSyncStatus('✅ Synced','green');
+    saveRetryDelay=1000;
+    saveInFlight=false;
+    if(savePending){savePending=false;saveToFirebase();}
   }catch(err){
     console.error('Firebase save error:',err);
-    updateSyncStatus('⚠️ Offline','orange');
+    saveInFlight=false;
+    savePending=false;
+    const delaySec=Math.round(saveRetryDelay/1000);
+    updateSyncStatus(`⚠️ Retrying in ${delaySec}s…`,'orange');
+    saveRetryTimer=setTimeout(()=>{saveRetryTimer=null;saveToFirebase();},saveRetryDelay);
+    saveRetryDelay=Math.min(saveRetryDelay*2,30000);
   }
 }
 
