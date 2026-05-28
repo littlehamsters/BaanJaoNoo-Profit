@@ -260,12 +260,9 @@ tbody td{padding:10px 12px}
   <div class="card"><div class="card-title"><span>🚚</span>บันทึกรอบส่ง</div>
     <div class="helper">เลือกออเดอร์ที่ส่งในรอบเดียวกัน → ระบบ recalc ค่าน้ำมันหาร ÷ จำนวนออเดอร์รวม</div>
     <div class="form-grid" style="margin-bottom:14px">
-      <div class="form-group"><label>วันที่ส่ง</label><input type="date" id="dr-date" oninput="renderDeliveryRoundPicker()"></div>
-      <div class="form-group"><label>รอบ</label>
-        <select id="dr-round">
-          <option value="เช้า">🌅 รอบเช้า</option>
-          <option value="บ่าย">🌞 รอบบ่าย</option>
-        </select>
+      <div class="form-group" style="grid-column:span 2">
+        <label>วันที่และเวลาที่ส่ง</label>
+        <input type="datetime-local" id="dr-datetime" oninput="renderDeliveryRoundPicker()">
       </div>
     </div>
     <div style="font-size:.82rem;font-weight:700;color:var(--text2);margin-bottom:8px">เลือกออเดอร์ในรอบนี้</div>
@@ -596,9 +593,9 @@ function recalcAllFifo(){
     const lots=S.dryLots.filter(l=>l.name===name).sort(lotSort);
     lots.forEach(l=>{l.soldBags=0;});
 
-    // ออเดอร์ขาย (TikTok + manual)
+    // ออเดอร์ขาย: เสร็จสมบูรณ์ หรือ จัดส่งแล้ว+มี Delivered Time (TikTok + manual)
     const orders=[...S.orders,...(S.manualSales||[])]
-      .filter(o=>['เสร็จสมบูรณ์','จัดส่งแล้ว','ที่จะจัดส่ง'].includes(o.status)&&o.items.some(i=>i.name===name))
+      .filter(o=>(o.status==='เสร็จสมบูรณ์'||(o.status==='จัดส่งแล้ว'&&o.deliveredDate))&&o.items.some(i=>i.name===name))
       .sort((a,b)=>parseDate(a.date)-parseDate(b.date));
     orders.forEach(o=>{
       const od=parseDate(o.date);
@@ -1205,7 +1202,8 @@ function tryPreview(){
       const oid=String(r['Order ID']||'').trim(),status=(r['Order Status']||'').trim();
       if(!oid||!['เสร็จสมบูรณ์','จัดส่งแล้ว','ที่จะจัดส่ง'].includes(status))return;
       if(!orderMap[oid])orderMap[oid]={id:oid,status,date:(r['Created Time']||'').split(' ')[0].trim(),
-        shippedDate:(r['Shipped Time']||'').trim().replace(/\\t/g,'')||null,items:[]};
+        shippedDate:(r['Shipped Time']||'').trim().replace(/\\t/g,'')||null,
+        deliveredDate:(r['Delivered Time']||'').trim().replace(/\\t/g,'')||null,items:[]};
       const name=VAR_MAP[r['Variation']||'']||(r['Variation']||'');
       orderMap[oid].items.push({variation:r['Variation']||'',name,qty:parseInt(r['Quantity'])||1,costPerBag:getFifoCost(name)});
     });
@@ -1234,19 +1232,20 @@ function tryPreview(){
       const needFeeUpdate=ex.tiktokFee===0&&fee>0;
       const needStatusUpdate=o.status&&o.status!==ex.status;
       const needRevenueUpdate=ex.revenue===0&&rev>0;
-      if(needFeeUpdate||needStatusUpdate||needRevenueUpdate){
+      const needDeliveredUpdate=!ex.deliveredDate&&o.deliveredDate;
+      if(needFeeUpdate||needStatusUpdate||needRevenueUpdate||needDeliveredUpdate){
         const newFee=needFeeUpdate?fee:ex.tiktokFee;
         const newRev=needRevenueUpdate||needFeeUpdate?(rev||ex.revenue):ex.revenue;
         const nc=round2(ex.productCost+ex.packCost+newFee);
         const np=round2(newRev-nc);
-        pendingUpdates.push({id:o.id,tiktokFee:newFee,revenue:newRev,totalCost:nc,profit:np,status:o.status});
+        pendingUpdates.push({id:o.id,tiktokFee:newFee,revenue:newRev,totalCost:nc,profit:np,status:o.status,deliveredDate:o.deliveredDate||ex.deliveredDate||null});
         updateCount++;
       } else {dupCount++;}
       return;
     }
     const tq=o.items.reduce((s,i)=>s+i.qty,0),hc=o.items.some(i=>i.variation==='ค่าเริ่มต้น');
     const pc=round2(o.items.reduce((s,i)=>s+i.costPerBag*i.qty,0)),pk=getPackCostFifo(tq,hc,o.date),tc=round2(pc+pk+fee),pr=round2(rev-tc);
-    pendingOrders.push({id:o.id,date:o.date,shippedDate:o.shippedDate||null,status:o.status,items:o.items,totalQty:tq,hasCorn6:hc,revenue:rev,productCost:pc,packCost:pk,tiktokFee:fee,deliveryCost:0,totalCost:tc,profit:pr});newCount++;
+    pendingOrders.push({id:o.id,date:o.date,shippedDate:o.shippedDate||null,deliveredDate:o.deliveredDate||null,status:o.status,items:o.items,totalQty:tq,hasCorn6:hc,revenue:rev,productCost:pc,packCost:pk,tiktokFee:fee,deliveryCost:0,totalCost:tc,profit:pr});newCount++;
   });
   if(!pendingCSV){Object.keys(incMap).forEach(id=>{const ex=exMap[id];if(ex&&ex.tiktokFee===0){const inc=incMap[id],fee=round2(Math.abs(parseFloat(inc['ค่าธรรมเนียมทั้งหมด'])||0)),rev=round2(parseFloat(inc['รายได้รวม'])||0);if(fee>0){const nc=round2(ex.productCost+ex.packCost+fee),np=round2((rev||ex.revenue)-nc);pendingUpdates.push({id,tiktokFee:fee,revenue:rev||ex.revenue,totalCost:nc,profit:np});updateCount++;}}});}
   document.getElementById('preview-stats').innerHTML=`
@@ -1278,7 +1277,7 @@ function confirmImport(){
       else if(useAB) deductBoxFifo('AB',1);
     }
   });
-  (pendingUpdates||[]).forEach(u=>{const o=S.orders.find(x=>x.id===u.id);if(o){o.tiktokFee=u.tiktokFee;o.revenue=u.revenue;o.totalCost=u.totalCost;o.profit=u.profit;if(u.status)o.status=u.status;}});
+  (pendingUpdates||[]).forEach(u=>{const o=S.orders.find(x=>x.id===u.id);if(o){o.tiktokFee=u.tiktokFee;o.revenue=u.revenue;o.totalCost=u.totalCost;o.profit=u.profit;if(u.status)o.status=u.status;if(u.deliveredDate)o.deliveredDate=u.deliveredDate;}});
   recalcAllFifo();
   recalcDeliveryCosts();
   saveState();
@@ -1707,51 +1706,37 @@ function clearAllData(){if(!confirm('⚠️ ล้างข้อมูลทั
 
 // ===================== DELIVERY ROUNDS =====================
 function renderDeliveryRoundPicker(){
-  const date = document.getElementById('dr-date').value;
-  const picker = document.getElementById('dr-order-picker');
-  const preview = document.getElementById('dr-preview');
-  if(!date){picker.innerHTML='<div style="color:var(--text2);font-size:.83rem">เลือกวันที่ก่อนค่ะ</div>';preview.style.display='none';return;}
+  const dt=document.getElementById('dr-datetime').value;
+  const picker=document.getElementById('dr-order-picker');
+  const preview=document.getElementById('dr-preview');
+  if(!dt){picker.innerHTML='<div style="color:var(--text2);font-size:.83rem">เลือกวันที่และเวลาก่อนค่ะ</div>';preview.style.display='none';return;}
+  const date=dt.slice(0,10);
+  const assignedIds=new Set((S.deliveryRounds||[]).flatMap(r=>r.orderIds));
 
-  // หา order IDs ที่มีรอบส่งแล้ว (ยกเว้นรอบที่กำลังแก้ไข)
-  const assignedIds = new Set((S.deliveryRounds||[]).flatMap(r=>r.orderIds));
-
-  // หาออเดอร์ TikTok วันนั้น (จัดส่งแล้ว + ที่จะจัดส่ง + เสร็จสมบูรณ์) ที่ยังไม่มีรอบส่ง
-  const ttOrders = S.orders.filter(o=>{
-    const od = o.shippedDate || o.date;
-    const odParsed = parseOrderDate(od);
-    const dateParsed = new Date(date);
-    return odParsed.toDateString()===dateParsed.toDateString() &&
-      ['จัดส่งแล้ว','ที่จะจัดส่ง','เสร็จสมบูรณ์'].includes(o.status) &&
-      !assignedIds.has(o.id);
+  // TikTok orders — normalize date to YYYY-MM-DD
+  const ttOrders=S.orders.filter(o=>{
+    const raw=o.shippedDate||o.date;
+    const od=raw.includes('/')?raw.slice(0,10).split('/').reverse().join('-'):raw.slice(0,10);
+    return od===date && ['จัดส่งแล้ว','ที่จะจัดส่ง','เสร็จสมบูรณ์'].includes(o.status) && !assignedIds.has(o.id);
   });
 
-  // หาออเดอร์ Manual วันนั้น ที่ยังไม่มีรอบส่ง
-  const manOrders = (S.manualSales||[]).filter(o=>
-    parseOrderDate(o.date).toDateString()===new Date(date).toDateString() &&
-    !assignedIds.has(o.id)
-  );
+  // Manual orders — normalize date to YYYY-MM-DD
+  const manOrders=(S.manualSales||[]).filter(o=>{
+    const od=o.date.includes('/')?o.date.split('/').reverse().join('-'):o.date;
+    return od===date && !assignedIds.has(o.id);
+  });
 
-  // เช็คว่าวันนี้มีรอบส่งแล้วกี่รอบ
-  const roundsToday = (S.deliveryRounds||[]).filter(r=>r.date===date);
-  if(roundsToday.length>=2){
-    picker.innerHTML='<div style="color:var(--red);font-size:.83rem;padding:8px">⚠️ วันนี้มีรอบส่งครบ 2 รอบแล้ว</div>';
-    preview.style.display='none';return;
-  }
-
-  const allSelectable = [
-    ...ttOrders.map(o=>({id:o.id, label:`TikTok ${o.id.slice(-8)} | ${o.items.map(i=>`${i.name}×${i.qty}`).join(', ')}`, source:'tiktok'})),
-    ...manOrders.map(o=>({id:o.id, label:`${o.platform} | ${o.items.map(i=>`${i.name}×${i.qty}`).join(', ')}`, source:'manual'}))
+  const allSelectable=[
+    ...ttOrders.map(o=>({id:o.id,label:`🛒 TikTok ${o.id.slice(-8)} | ${o.items.map(i=>`${i.name}×${i.qty}`).join(', ')}`,source:'tiktok'})),
+    ...manOrders.map(o=>({id:o.id,label:`🏪 ${o.platform} | ${o.items.map(i=>`${i.name}×${i.qty}`).join(', ')}`,source:'manual'}))
   ];
 
-  if(!allSelectable.length){
-    picker.innerHTML='<div style="color:var(--text2);font-size:.83rem">ไม่มีออเดอร์วันนี้</div>';
-    preview.style.display='none';return;
-  }
+  if(!allSelectable.length){picker.innerHTML='<div style="color:var(--text2);font-size:.83rem">ไม่มีออเดอร์วันนี้ที่ยังไม่มีรอบส่ง</div>';preview.style.display='none';return;}
 
-  picker.innerHTML = allSelectable.map(o=>`
+  picker.innerHTML=allSelectable.map(o=>`
     <label style="display:flex;gap:10px;align-items:center;padding:7px 6px;border-radius:6px;cursor:pointer;font-size:.83rem;border-bottom:1px solid var(--border)" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
       <input type="checkbox" value="${o.id}" data-source="${o.source}" onchange="updateDRPreview()" style="width:16px;height:16px;accent-color:var(--accent)">
-      <span>${o.source==='tiktok'?'🛒':'🏪'} ${o.label}</span>
+      <span>${o.label}</span>
     </label>`).join('');
   preview.style.display='none';
 }
@@ -1767,10 +1752,11 @@ function updateDRPreview(){
 }
 
 function saveDeliveryRound(){
-  const date = document.getElementById('dr-date').value;
-  const round = document.getElementById('dr-round').value;
+  const dt=document.getElementById('dr-datetime').value;
   const checked = document.querySelectorAll('#dr-order-picker input:checked');
-  if(!date||!checked.length){showNotif('กรุณาเลือกวันที่และออเดอร์','error');return;}
+  if(!dt||!checked.length){showNotif('กรุณาเลือกวันที่/เวลาและออเดอร์','error');return;}
+  const date=dt.slice(0,10);
+  const round=dt.slice(11,16);
 
   const orderIds = [...checked].map(c=>({id:c.value, source:c.dataset.source}));
   const count = orderIds.length;
@@ -1797,7 +1783,7 @@ function saveDeliveryRound(){
 
   saveState();renderDeliveryRounds();renderOverview();
   // reset
-  document.getElementById('dr-date').value='';
+  document.getElementById('dr-datetime').value='';
   document.getElementById('dr-order-picker').innerHTML='<div style="color:var(--text2);font-size:.83rem">เลือกวันที่ก่อนค่ะ</div>';
   document.getElementById('dr-preview').style.display='none';
   showNotif(`บันทึกรอบส่ง ${round} ${count} ออเดอร์ ค่าน้ำมัน ฿${costPerTrip.toFixed(2)} ✅`);
@@ -1809,7 +1795,7 @@ function renderDeliveryRounds(){
   if(!rounds.length){tbody.innerHTML='<tr><td colspan="7"><div class="empty"><div class="ei">🚚</div><p>ยังไม่มีข้อมูล</p></div></td></tr>';return;}
   tbody.innerHTML=rounds.map(r=>`<tr>
     <td>${r.date}</td>
-    <td>${r.round==='เช้า'?'🌅 เช้า':'🌞 บ่าย'}</td>
+    <td>🕐 ${r.round}</td>
     <td style="font-size:.78rem;color:var(--text2)">${r.orderIds.map(id=>id.slice(-6)).join(', ')}</td>
     <td class="text-right">${r.vehicle}</td>
     <td class="text-right">฿${r.costPerTrip.toFixed(2)}</td>
@@ -2055,7 +2041,7 @@ function showPage(id){
   if(id==='p-settings')renderSettings();
   if(id==='p-profit')renderOverview();
   if(id==='p-manual'){renderManualItems();renderManualList();renderDeliveryRounds();
-    document.getElementById('dr-date').value=new Date().toISOString().slice(0,10);
+    document.getElementById('dr-datetime').value=new Date().toISOString().slice(0,16);
     renderDeliveryRoundPicker();}
   if(id==='p-stock'){renderFreshList();renderFreshStockGrid();renderDryStock();renderDryLots();initBoxLots();renderBoxStock();renderBoxLots();}
 }
