@@ -579,8 +579,9 @@ function fixAndRecalc(){
   if(!S.boxLots)S.boxLots=JSON.parse(JSON.stringify(BOX_INITIAL_LOTS));
   // ตรวจสอบและเพิ่ม init lots ถ้าหาย
   Object.entries(INITIAL_STOCK).filter(([,q])=>q>0).forEach(([name,qty])=>{
-    const lot=S.dryLots.find(l=>l.id==='lot-init-'+name.replace(/ /g,'_'));
-    if(!lot){S.dryLots.push({id:'lot-init-'+name.replace(/ /g,'_'),date:'2026-05-18',name,isInit:true,rawCost:0,elecCost:0,bagCost:0,rawQty:'สต็อกตั้งต้น 18/05',totalBags:qty,soldBags:0,costPerBag:INITIAL_COSTS[name]||0,remnantGrams:0,remnantCost:0,remnantUsed:false});}
+    let lot=S.dryLots.find(l=>l.id==='lot-init-'+name.replace(/ /g,'_'));
+    if(!lot){S.dryLots.push({id:'lot-init-'+name.replace(/ /g,'_'),date:'2026-05-18',name,isInit:true,rawCost:0,elecCost:0,bagCost:0,rawQty:'สต็อกตั้งต้น 18/05',totalBags:qty,soldBags:0,costPerBag:INITIAL_COSTS[name]||0,remnantGrams:0,remnantCost:0,remnantUsed:false});lot=S.dryLots[S.dryLots.length-1];}
+    lot.totalBags=qty;lot.costPerBag=INITIAL_COSTS[name]||0;
   });
   if(!S.settings.sticker)S.settings.sticker=0.181;
   recalcAllFifo();
