@@ -607,19 +607,20 @@ function recalcAllFifo(){
     const lots=S.dryLots.filter(l=>l.name===name).sort(lotSort);
     lots.forEach(l=>{l.soldBags=0;});
 
-    // ออเดอร์ขาย (TikTok + manual)
+    // ออเดอร์ขาย (TikTok + manual) — FIFO แบบไม่เช็ค order date,
+    // เพราะ init lot แทน "สต็อกที่มีอยู่ก่อนหน้า" ออเดอร์ก่อน init date ก็หักจากมันได้
     const orders=[...S.orders,...(S.manualSales||[])]
       .filter(o=>['เสร็จสมบูรณ์','จัดส่งแล้ว','ที่จะจัดส่ง'].includes(o.status)&&o.items.some(i=>i.name===name))
       .sort((a,b)=>parseDate(a.date)-parseDate(b.date));
     orders.forEach(o=>{
-      const od=parseDate(o.date);
       let rem=o.items.filter(i=>i.name===name).reduce((s,i)=>s+i.qty,0);
       for(const lot of lots){
         if(rem<=0)break;
-        if(od<parseDate(lot.date))break;
         const take=Math.min(lot.totalBags-lot.soldBags,rem);
         lot.soldBags+=take;rem-=take;
       }
+      // ถ้า deduct ไม่หมด → dump ส่วนเกินใส่ lot สุดท้าย เพื่อให้ stock ติดลบและเห็นว่าข้อมูลขาด
+      if(rem>0&&lots.length>0) lots[lots.length-1].soldBags+=rem;
     });
 
     // รายการปรับลด (เสียหาย/ให้แฮม/ตัวอย่าง)
@@ -634,7 +635,7 @@ function recalcAllFifo(){
       }
     });
 
-    S.stock[name]=lots.reduce((s,l)=>s+Math.max(0,l.totalBags-l.soldBags),0);
+    S.stock[name]=lots.reduce((s,l)=>s+(l.totalBags-l.soldBags),0);
   });
 }
 
@@ -983,9 +984,10 @@ function saveDryLot(){
 function renderDryStock(){
   const g=document.getElementById('dry-stock-grid');if(!g)return;
   g.innerHTML=Object.keys(PRODUCT_ICONS).map(name=>{
-    const qty=S.stock[name]||0,cpb=getFifoCost(name),pct=Math.min((qty/30)*100,100);
-    const cls=qty===0?'stock-low':qty<=5?'stock-med':'';
-    return `<div class="prod-card ${cls}"><div class="pc-icon">${PRODUCT_ICONS[name]}</div><div class="pc-name">${name}</div><div class="pc-stock">${qty} ถุงเหลือ</div><div class="pc-cost">฿${cpb.toFixed(2)}/ถุง (FIFO)</div><div class="stock-bar ${cls}"><div class="stock-fill" style="width:${pct}%"></div></div></div>`;
+    const qty=S.stock[name]||0,cpb=getFifoCost(name),pct=Math.max(0,Math.min((qty/30)*100,100));
+    const cls=qty<=0?'stock-low':qty<=5?'stock-med':'';
+    const stockLabel=qty<0?`<b style="color:var(--red)">${qty}</b> ถุง (ข้อมูลขาด!)`:`${qty} ถุงเหลือ`;
+    return `<div class="prod-card ${cls}"><div class="pc-icon">${PRODUCT_ICONS[name]}</div><div class="pc-name">${name}</div><div class="pc-stock">${stockLabel}</div><div class="pc-cost">฿${cpb.toFixed(2)}/ถุง (FIFO)</div><div class="stock-bar ${cls}"><div class="stock-fill" style="width:${pct}%"></div></div></div>`;
   }).join('');
 }
 
@@ -2113,7 +2115,7 @@ function checkLowStock(){
   const warnings=[];
   // ถุงอบแห้ง < 5
   Object.entries(S.stock).forEach(([name,qty])=>{
-    if(qty>0&&qty<5) warnings.push(`${PRODUCT_ICONS[name]||''} ${name}: เหลือ ${qty} ถุง`);
+    if(qty<5) warnings.push(`${PRODUCT_ICONS[name]||''} ${name}: เหลือ ${qty} ถุง${qty<0?' (ข้อมูลขาด!)':''}`);
   });
   // กล่อง < 15
   ['AB','B'].forEach(type=>{
