@@ -613,11 +613,9 @@ function recalcAllFifo(){
       .filter(o=>['เสร็จสมบูรณ์','จัดส่งแล้ว','ที่จะจัดส่ง'].includes(o.status)&&o.items.some(i=>i.name===name))
       .sort((a,b)=>parseDate(a.date)-parseDate(b.date));
     orders.forEach(o=>{
-      const od=parseDate(o.date);
       let rem=o.items.filter(i=>i.name===name).reduce((s,i)=>s+i.qty,0);
       for(const lot of lots){
         if(rem<=0)break;
-        if(od<parseDate(lot.date))break;
         const take=Math.min(lot.totalBags-lot.soldBags,rem);
         lot.soldBags+=take;rem-=take;
       }
