@@ -1536,7 +1536,7 @@ function renderOverview(){
   const sv=Object.entries(S.stock).reduce((s,[n,q])=>s+q*(getFifoCost(n)||0),0);
   const tiktokOrders=S.orders.length,manualOrders=(S.manualSales||[]).length;
   const totalLoss=round2((S.dryAdjustments||[]).reduce((s,a)=>s+a.totalCost,0));
-  const totalDeliveryTT=round2(S.orders.reduce((s,o)=>s+(o.deliveryCost||0),0));
+  const totalDeliveryTT=round2([...S.orders,...(S.manualSales||[])].reduce((s,o)=>s+(o.deliveryCost||0),0));
   const totalTravelFresh=round2(S.freshPurchases.filter(p=>!p.isAdjust).reduce((s,p)=>s+(p.travel||0),0));
   const totalTransport=round2(totalDeliveryTT+totalTravelFresh);
   document.getElementById('overview-stats').innerHTML=`
@@ -1592,7 +1592,7 @@ function clearOrderFilters(){document.getElementById('filter-status').value='';d
 
 function renderOrders(){
   const fs=document.getElementById('filter-status').value,ff=document.getElementById('filter-date-from').value,ft=document.getElementById('filter-date-to').value;
-  let orders=S.orders;
+  let orders=[...S.orders,...(S.manualSales||[])];
   if(fs)orders=orders.filter(o=>o.status===fs);
   if(ff)orders=orders.filter(o=>parseOrderDate(o.date)>=new Date(ff));
   if(ft)orders=orders.filter(o=>parseOrderDate(o.date)<=new Date(ft+'T23:59:59'));
