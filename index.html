@@ -284,32 +284,60 @@ tbody td{padding:10px 12px}
 
 <!-- IMPORT PAGE -->
 <div id="p-import" class="page">
-  <div class="helper">📌 อัพโหลด <b>Order Report (.csv)</b> และ <b>Income Report (.xlsx)</b> จาก TikTok Shop<br>ระบบจะ join ด้วย Order ID, ตรวจซ้ำ, อัพเดท fee และตัดสต็อกอัตโนมัติ</div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-    <div class="card" style="margin-bottom:0"><div class="card-title"><span>📄</span>Order Report (.csv)</div>
-      <div class="upload-zone" onclick="document.getElementById('inp-csv').click()" id="zone-csv" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleDrop(event,'csv')">
-        <div class="uz-icon">📋</div><div class="uz-text">คลิกหรือลากไฟล์มาวาง</div><div class="uz-sub">.csv จาก Orders</div>
+  <div class="inner-tabs">
+    <button class="inner-tab active" onclick="showInner('import-tiktok','import-shopee',this)">🛒 TikTok</button>
+    <button class="inner-tab" onclick="showInner('import-shopee','import-tiktok',this)">🛍️ Shopee</button>
+  </div>
+
+  <div id="import-tiktok">
+    <div class="helper">📌 อัพโหลด <b>Order Report (.csv)</b> และ <b>Income Report (.xlsx)</b> จาก TikTok Shop<br>ระบบจะ join ด้วย Order ID, ตรวจซ้ำ, อัพเดท fee และตัดสต็อกอัตโนมัติ</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div class="card" style="margin-bottom:0"><div class="card-title"><span>📄</span>Order Report (.csv)</div>
+        <div class="upload-zone" onclick="document.getElementById('inp-csv').click()" id="zone-csv" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleDrop(event,'csv')">
+          <div class="uz-icon">📋</div><div class="uz-text">คลิกหรือลากไฟล์มาวาง</div><div class="uz-sub">.csv จาก Orders</div>
+        </div>
+        <div style="font-size:.75rem;color:var(--text2);margin-top:6px;text-align:center">อัพโหลดอย่างเดียวก็ได้ หรือทั้งคู่เพื่อได้ข้อมูลครบ</div>
+        <input type="file" id="inp-csv" accept=".csv" style="display:none" onchange="loadCSV(this)">
+        <div id="csv-status"></div>
       </div>
-      <div style="font-size:.75rem;color:var(--text2);margin-top:6px;text-align:center">อัพโหลดอย่างเดียวก็ได้ หรือทั้งคู่เพื่อได้ข้อมูลครบ</div>
-      <input type="file" id="inp-csv" accept=".csv" style="display:none" onchange="loadCSV(this)">
-      <div id="csv-status"></div>
+      <div class="card" style="margin-bottom:0"><div class="card-title"><span>💰</span>Income Report (.xlsx)</div>
+        <div class="upload-zone" onclick="document.getElementById('inp-xlsx').click()" id="zone-xlsx" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleDrop(event,'xlsx')">
+          <div class="uz-icon">📊</div><div class="uz-text">คลิกหรือลากไฟล์มาวาง</div><div class="uz-sub">.xlsx จาก Finance</div>
+        </div>
+        <div style="font-size:.75rem;color:var(--text2);margin-top:6px;text-align:center">อัพโหลดอย่างเดียวก็ได้ หรือทั้งคู่เพื่อได้ข้อมูลครบ</div>
+        <input type="file" id="inp-xlsx" accept=".xlsx" style="display:none" onchange="loadXLSX(this)">
+        <div id="xlsx-status"></div>
+      </div>
     </div>
-    <div class="card" style="margin-bottom:0"><div class="card-title"><span>💰</span>Income Report (.xlsx)</div>
-      <div class="upload-zone" onclick="document.getElementById('inp-xlsx').click()" id="zone-xlsx" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleDrop(event,'xlsx')">
-        <div class="uz-icon">📊</div><div class="uz-text">คลิกหรือลากไฟล์มาวาง</div><div class="uz-sub">.xlsx จาก Finance</div>
+    <div id="import-preview" style="display:none">
+      <div class="card"><div class="card-title"><span>🔍</span>Preview ก่อน Import</div>
+        <div id="preview-stats" class="stat-row" style="margin-bottom:16px"></div>
+        <div class="tbl-wrap"><table><thead><tr><th>Order ID</th><th>วันที่</th><th>สถานะ</th><th>สินค้า</th><th>ซอง</th><th>รายได้</th><th>ต้นทุน</th><th>ค่าแพ็ค</th><th>TikTok Fee</th><th>กำไร</th></tr></thead><tbody id="preview-tbody"></tbody></table></div>
+        <div style="margin-top:16px;display:flex;gap:12px">
+          <button class="btn btn-primary" onclick="confirmImport()">✅ ยืนยัน Import</button>
+          <button class="btn btn-outline" onclick="cancelImport()">ยกเลิก</button>
+        </div>
       </div>
-      <div style="font-size:.75rem;color:var(--text2);margin-top:6px;text-align:center">อัพโหลดอย่างเดียวก็ได้ หรือทั้งคู่เพื่อได้ข้อมูลครบ</div>
-      <input type="file" id="inp-xlsx" accept=".xlsx" style="display:none" onchange="loadXLSX(this)">
-      <div id="xlsx-status"></div>
     </div>
   </div>
-  <div id="import-preview" style="display:none">
-    <div class="card"><div class="card-title"><span>🔍</span>Preview ก่อน Import</div>
-      <div id="preview-stats" class="stat-row" style="margin-bottom:16px"></div>
-      <div class="tbl-wrap"><table><thead><tr><th>Order ID</th><th>วันที่</th><th>สถานะ</th><th>สินค้า</th><th>ซอง</th><th>รายได้</th><th>ต้นทุน</th><th>ค่าแพ็ค</th><th>TikTok Fee</th><th>กำไร</th></tr></thead><tbody id="preview-tbody"></tbody></table></div>
-      <div style="margin-top:16px;display:flex;gap:12px">
-        <button class="btn btn-primary" onclick="confirmImport()">✅ ยืนยัน Import</button>
-        <button class="btn btn-outline" onclick="cancelImport()">ยกเลิก</button>
+
+  <div id="import-shopee" style="display:none">
+    <div class="helper">📌 อัพโหลด <b>Order Report (.xlsx)</b> จาก Shopee Seller Center (sheet "orders")<br>ระบบจะตรวจซ้ำด้วย Order ID และตัดสต็อกอัตโนมัติเฉพาะออเดอร์หลังวันเริ่มตัดสต็อก</div>
+    <div class="card" style="margin-bottom:16px"><div class="card-title"><span>🛍️</span>Shopee Order Report (.xlsx)</div>
+      <div class="upload-zone" onclick="document.getElementById('inp-shopee').click()" id="zone-shopee" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleShopeeDrop(event)">
+        <div class="uz-icon">🛍️</div><div class="uz-text">คลิกหรือลากไฟล์มาวาง</div><div class="uz-sub">.xlsx จาก Shopee Orders</div>
+      </div>
+      <input type="file" id="inp-shopee" accept=".xlsx" style="display:none" onchange="loadShopeeXLSX(this)">
+      <div id="shopee-status"></div>
+    </div>
+    <div id="import-shopee-preview" style="display:none">
+      <div class="card"><div class="card-title"><span>🔍</span>Preview ก่อน Import (Shopee)</div>
+        <div id="shopee-preview-stats" class="stat-row" style="margin-bottom:16px"></div>
+        <div class="tbl-wrap"><table><thead><tr><th>Order ID</th><th>วันที่</th><th>ส่งเมื่อ</th><th>สินค้า</th><th class="text-right">ซอง</th><th class="text-right">รายได้</th><th class="text-right">Fee</th><th class="text-right">กำไร</th><th>ตัดสต็อก</th></tr></thead><tbody id="shopee-preview-tbody"></tbody></table></div>
+        <div style="margin-top:16px;display:flex;gap:12px">
+          <button class="btn btn-primary" onclick="confirmShopeeImport()">✅ ยืนยัน Import</button>
+          <button class="btn btn-outline" onclick="cancelShopeeImport()">ยกเลิก</button>
+        </div>
       </div>
     </div>
   </div>
@@ -541,7 +569,7 @@ const INITIAL_STOCK={'ข้าวโพด 3 แว่น':5,'แครอท':
 const INITIAL_COSTS={'ข้าวโพด 3 แว่น':6.51,'แครอท':5.35,'ฟักทอง':5.69,'แอปเปิ้ล':17.27,'แตงกวา':11.02,'บล็อคโคลี่':18.24,'บวบ':8.80,'กล้วย':8.35,'ส้มแมนดาริน':0,'ข้าวโพด 6 แว่น':11.99};
 const DEFAULT_SETTINGS={costs:INITIAL_COSTS,pack1:1.30,pack2:2.35,pack3:2.95,elec:5.0,bag1217:0.66,bag1220:0.84,bag1522:1.10,kanchuean:0.50,
   fuel91:43.68,fuel95:44.05,motoKmpl:45.3,carKmpl:23.6,deliveryKm:4,carThreshold:14,deliveryStart:'2026-05-23',
-  sticker:0.181};
+  sticker:0.181,shopeeStockStart:'2026-05-29'};
 const FRESH_TO_DRY={'ข้าวโพด':[{name:'ข้าวโพด 3 แว่น',slicesPerBag:3},{name:'ข้าวโพด 6 แว่น',slicesPerBag:6}],'แครอท':[{name:'แครอท'}],'ฟักทอง':[{name:'ฟักทอง'}],'แอปเปิ้ล':[{name:'แอปเปิ้ล'}],'แตงกวา':[{name:'แตงกวา'}],'บล็อคโคลี่':[{name:'บล็อคโคลี่'}],'บวบ':[{name:'บวบ'}],'กล้วย':[{name:'กล้วย'}],'ส้มแมนดาริน':[{name:'ส้มแมนดาริน'}]};
 const VAR_MAP={'ข้าวโพด อบแห้ง 3 แว่น':'ข้าวโพด 3 แว่น','แครอท อบแห้ง':'แครอท','ฟักทอง อบแห้ง':'ฟักทอง','แอปเปิ้ล อบแห้ง':'แอปเปิ้ล','แตงกวา อบแห้ง':'แตงกวา','บล็อคโคลี่ อบแห้ง':'บล็อคโคลี่','บวบ อบแห้ง':'บวบ','กล้วย อบแห้ง':'กล้วย','ค่าเริ่มต้น':'ข้าวโพด 6 แว่น'};
 
@@ -586,6 +614,7 @@ function fixAndRecalc(){
     lot.totalBags=qty;lot.costPerBag=INITIAL_COSTS[name]||0;
   });
   if(!S.settings.sticker)S.settings.sticker=0.181;
+  if(!S.settings.shopeeStockStart)S.settings.shopeeStockStart='2026-05-29';
   recalcAllFifo();
 }
 
@@ -610,9 +639,9 @@ function recalcAllFifo(){
     const lots=S.dryLots.filter(l=>l.name===name).sort(lotSort);
     lots.forEach(l=>{l.soldBags=0;});
 
-    // ออเดอร์ขาย (TikTok + manual)
+    // ออเดอร์ขาย (TikTok + manual) — ข้ามออเดอร์ที่ stockCutoff=false (Shopee ก่อน cutoff date)
     const orders=[...S.orders,...(S.manualSales||[])]
-      .filter(o=>['เสร็จสมบูรณ์','จัดส่งแล้ว','ที่จะจัดส่ง'].includes(o.status)&&o.items.some(i=>i.name===name))
+      .filter(o=>['เสร็จสมบูรณ์','จัดส่งแล้ว','ที่จะจัดส่ง'].includes(o.status)&&o.items.some(i=>i.name===name)&&o.stockCutoff!==false)
       .sort((a,b)=>parseDate(a.date)-parseDate(b.date));
     orders.forEach(o=>{
       let rem=o.items.filter(i=>i.name===name).reduce((s,i)=>s+i.qty,0);
@@ -1306,6 +1335,161 @@ function confirmImport(){
 }
 function cancelImport(){pendingCSV=null;pendingXLSX=null;pendingOrders=null;pendingUpdates=null;document.getElementById('import-preview').style.display='none';}
 
+// ===================== SHOPEE IMPORT =====================
+const SHOPEE_PRODUCT_NAMES=new Set(['แครอท','บล็อคโคลี่','ฟักทอง','แอปเปิ้ล','แตงกวา','บวบ','กล้วย','ข้าวโพด 3 แว่น']);
+let pendingShopeeXLSX=null, pendingShopeeOrders=null;
+
+function getShopeeCutoffDate(){
+  const s=(S.settings&&S.settings.shopeeStockStart)||'2026-05-29';
+  return new Date(s);
+}
+
+function shopeeMapName(variation, productName){
+  const v=(variation||'').trim();
+  const p=(productName||'').trim();
+  if(v && SHOPEE_PRODUCT_NAMES.has(v)) return v;
+  if(!v && (p.includes('6แว่น')||p.includes('6 แว่น'))) return 'ข้าวโพด 6 แว่น';
+  return v||p;
+}
+
+function formatShopeeDate(s){
+  if(!s) return '';
+  const d=new Date(s);
+  if(isNaN(d.getTime())) return String(s);
+  const dd=String(d.getDate()).padStart(2,'0');
+  const mm=String(d.getMonth()+1).padStart(2,'0');
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}
+
+function handleShopeeDrop(e){
+  e.preventDefault();
+  document.getElementById('zone-shopee').classList.remove('dragover');
+  const f=e.dataTransfer.files[0];
+  if(f) processShopeeXLSXFile(f);
+}
+
+function loadShopeeXLSX(inp){if(inp.files[0]) processShopeeXLSXFile(inp.files[0]);}
+
+function processShopeeXLSXFile(file){
+  const r=new FileReader();
+  r.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets['orders']||wb.Sheets[wb.SheetNames[0]];
+      pendingShopeeXLSX=XLSX.utils.sheet_to_json(ws,{defval:''});
+      showFileReady('shopee-status',file.name,pendingShopeeXLSX.length+' แถว');
+      tryShopeePreview();
+    }catch(err){showNotif('อ่าน XLSX ไม่ได้: '+err.message,'error');}
+  };
+  r.readAsArrayBuffer(file);
+}
+
+function tryShopeePreview(){
+  if(!pendingShopeeXLSX) return;
+  const cutoff=getShopeeCutoffDate();
+  const existingIds=new Set((S.manualSales||[]).filter(s=>s.source==='shopee').map(s=>s.id));
+  const orderMap={};
+
+  pendingShopeeXLSX.forEach(r=>{
+    const oid=String(r['หมายเลขคำสั่งซื้อ']||'').trim();
+    const status=(r['สถานะการสั่งซื้อ']||'').trim();
+    if(!oid||status!=='สำเร็จแล้ว') return;
+    if(!orderMap[oid]){
+      orderMap[oid]={
+        id:oid,
+        date:formatShopeeDate(r['วันที่ทำการสั่งซื้อ']||''),
+        shippedDate:String(r['เวลาส่งสินค้า']||'').trim(),
+        revenue:round2(parseFloat(r['ราคาสินค้าที่ชำระโดยผู้ซื้อ (THB)']||0)),
+        commission:round2(Math.abs(parseFloat(r['ค่าคอมมิชชั่น']||0))),
+        transFee:round2(Math.abs(parseFloat(r['Transaction Fee']||0))),
+        items:[]
+      };
+    }
+    const name=shopeeMapName(r['ชื่อตัวเลือก'],r['ชื่อสินค้า']);
+    const qty=parseInt(r['จำนวน'])||1;
+    orderMap[oid].items.push({name,qty,costPerBag:getFifoCost(name)});
+  });
+
+  pendingShopeeOrders=[];
+  let newCount=0, dupCount=0, cutoffCount=0;
+
+  Object.values(orderMap).forEach(o=>{
+    if(existingIds.has(o.id)){dupCount++;return;}
+    const tq=o.items.reduce((s,i)=>s+i.qty,0);
+    const hc=o.items.some(i=>i.name==='ข้าวโพด 6 แว่น');
+    const productCost=round2(o.items.reduce((s,i)=>s+i.costPerBag*i.qty,0));
+    const packCost=getPackCostFifo(tq,hc,o.date);
+    const fee=round2(o.commission+o.transFee);
+    const totalCost=round2(productCost+packCost+fee);
+    const profit=round2(o.revenue-totalCost);
+    const shippedDt=o.shippedDate?new Date(o.shippedDate):null;
+    const stockCutoff=!!(shippedDt && !isNaN(shippedDt.getTime()) && shippedDt>=cutoff);
+    if(stockCutoff) cutoffCount++;
+    pendingShopeeOrders.push({
+      id:o.id, date:o.date, shippedDate:o.shippedDate||null,
+      platform:'Shopee', source:'shopee', status:'เสร็จสมบูรณ์',
+      items:o.items, totalQty:tq, hasCorn6:hc,
+      revenue:o.revenue, productCost, packCost,
+      tiktokFee:fee, feePct:o.revenue>0?round2(fee/o.revenue*100):0, shippingCost:0,
+      totalCost, profit, stockCutoff
+    });
+    newCount++;
+  });
+
+  document.getElementById('shopee-preview-stats').innerHTML=`
+    <div class="stat-card"><div class="s-label">ออเดอร์ใหม่</div><div class="s-val s-green">${newCount}</div></div>
+    <div class="stat-card"><div class="s-label">ซ้ำ</div><div class="s-val s-accent">${dupCount}</div></div>
+    <div class="stat-card"><div class="s-label">ตัดสต็อก / ไม่ตัด</div><div class="s-val s-blue">${cutoffCount} / ${newCount-cutoffCount}</div></div>
+    <div class="stat-card"><div class="s-label">รายได้ใหม่</div><div class="s-val s-blue">฿${pendingShopeeOrders.reduce((s,o)=>s+o.revenue,0).toFixed(0)}</div></div>`;
+
+  document.getElementById('shopee-preview-tbody').innerHTML=pendingShopeeOrders.map(o=>
+    `<tr><td style="font-family:monospace;font-size:.75rem">${o.id.slice(-8)}</td><td>${o.date}</td><td style="font-size:.75rem;color:var(--text2)">${o.shippedDate||'-'}</td><td style="max-width:180px;white-space:normal;font-size:.78rem">${o.items.map(i=>`${PRODUCT_ICONS[i.name]||''}${i.name}×${i.qty}`).join(', ')}</td><td class="text-right">${o.totalQty}</td><td class="text-right">฿${o.revenue.toFixed(2)}</td><td class="text-right">฿${o.tiktokFee.toFixed(2)}</td><td class="text-right ${o.profit>=0?'profit-pos':'profit-neg'}">฿${o.profit.toFixed(2)}</td><td style="text-align:center">${o.stockCutoff?'✅':'⏭️'}</td></tr>`
+  ).join('');
+
+  document.getElementById('import-shopee-preview').style.display='';
+}
+
+function confirmShopeeImport(){
+  const saved=pendingShopeeOrders?.length||0;
+  if(!S.manualSales) S.manualSales=[];
+
+  (pendingShopeeOrders||[]).forEach(o=>{
+    S.manualSales.push(o);
+    if(o.stockCutoff){
+      // หักสต็อกถุงอบแห้ง
+      o.items.forEach(item=>{
+        if(S.stock[item.name]!==undefined)
+          S.stock[item.name]=Math.max(0,S.stock[item.name]-item.qty);
+      });
+      // หักกล่อง FIFO
+      const od=new Date(o.date.includes('/')?o.date.split('/').reverse().join('-'):o.date);
+      if(od>=BOX_FIFO_START&&o.totalQty>0){
+        const useB=o.hasCorn6||o.totalQty>=5;
+        const useAB=!useB&&o.totalQty>=3;
+        if(useB) deductBoxFifo('B',1);
+        else if(useAB) deductBoxFifo('AB',1);
+      }
+    }
+  });
+
+  // recalcAllFifo จะข้ามออเดอร์ stockCutoff=false อัตโนมัติ (ดู filter ใน recalcAllFifo)
+  recalcAllFifo();
+  saveState();
+
+  pendingShopeeXLSX=null; pendingShopeeOrders=null;
+  document.getElementById('import-shopee-preview').style.display='none';
+  document.getElementById('shopee-status').innerHTML='';
+  document.getElementById('inp-shopee').value='';
+
+  showNotif(`Import Shopee ${saved} ออเดอร์ ✅`);
+  renderDryStock();renderOverview();renderManualList();renderBoxStock();
+}
+
+function cancelShopeeImport(){
+  pendingShopeeXLSX=null; pendingShopeeOrders=null;
+  document.getElementById('import-shopee-preview').style.display='none';
+}
+
 // ===================== PROFIT =====================
 let profitChart=null,qtyChart=null;
 
@@ -1955,7 +2139,7 @@ function renderManualList(){
   if(!list.length){tbody.innerHTML='<tr><td colspan="10"><div class="empty"><div class="ei">📝</div><p>ยังไม่มีข้อมูล</p></div></td></tr>';return;}
   tbody.innerHTML=list.map(s=>`<tr>
     <td>${s.date}</td>
-    <td><span class="badge badge-pend">${s.platform}</span></td>
+    <td>${s.stockCutoff===false?'<span class="badge" style="background:#e0e0e0;color:#666">📦 ไม่ตัดสต็อก</span>':`<span class="badge badge-pend">${s.platform}</span>`}</td>
     <td style="font-size:.78rem;max-width:180px;white-space:normal">${s.items.map(i=>`${PRODUCT_ICONS[i.name]||''}${i.name}×${i.qty}`).join(', ')}</td>
     <td class="text-right">฿${s.revenue.toFixed(2)}</td>
     <td class="text-right">฿${s.productCost.toFixed(2)}</td>
@@ -1970,8 +2154,8 @@ function renderManualList(){
 function deleteManualSale(id){
   if(!confirm('ลบรายการนี้?'))return;
   const sale=(S.manualSales||[]).find(s=>s.id===id);
-  if(sale){
-    // ✅ คืนสต็อกถุงอบแห้ง
+  if(sale && sale.stockCutoff!==false){
+    // ✅ คืนสต็อกถุงอบแห้ง (เฉพาะออเดอร์ที่เคยตัดสต็อก)
     sale.items.forEach(i=>{if(S.stock[i.name]!==undefined)S.stock[i.name]=(S.stock[i.name]||0)+i.qty;});
     // ✅ คืนกล่อง FIFO
     const od=new Date(sale.date.includes('/')?sale.date.split('/').reverse().join('-'):sale.date);
