@@ -169,10 +169,20 @@ tbody td{padding:10px 12px}
             <option value="เสียหาย/สีไม่สวย">เสียหาย/สีไม่สวย</option>
             <option value="ตัวอย่างลูกค้า">ตัวอย่างลูกค้า</option>
             <option value="ทดสอบรสชาติ">ทดสอบรสชาติ</option>
+            <option value="ส่งทดแทน (ถุงแตก)">ส่งทดแทน (ถุงแตก) 📦</option>
+            <option value="ส่งแก้ไขออเดอร์ผิด">ส่งแก้ไขออเดอร์ผิด 🔄</option>
             <option value="อื่นๆ">อื่นๆ</option>
           </select>
         </div>
         <div class="form-group"><label>หมายเหตุเพิ่มเติม</label><input type="text" id="da-note" placeholder="(ไม่บังคับ)"></div>
+        <div class="form-group">
+          <label>Order ID (ถ้ามี)</label>
+          <input type="text" id="da-orderid" placeholder="เช่น 583562138744292370">
+        </div>
+        <div class="form-group">
+          <label>ค่าส่งซ้ำ (฿)</label>
+          <input type="number" id="da-reshipping" placeholder="0" step="0.01" value="0">
+        </div>
       </div>
       <div id="da-preview" style="display:none;margin-top:10px;padding:8px 14px;background:var(--red-light);border-radius:8px;font-size:.83rem"></div>
       <div style="margin-top:12px"><button class="btn btn-outline" onclick="adjustDryStock()">📉 บันทึกการปรับลด</button></div>
@@ -1039,7 +1049,7 @@ function renderDryLots(){
     if(row.isAdj){
       return `<tr style="background:rgba(192,57,43,.04)">
         <td>${row.date}</td>
-        <td colspan="3" style="font-size:.78rem;color:var(--red)">📉 ${row.reason}${row.note?' — '+row.note:''}</td>
+        <td colspan="3" style="font-size:.78rem;color:var(--red)">📉 ${row.reason}${row.orderId?` <span style="font-size:.72rem;color:var(--blue)">#${row.orderId.slice(-8)}</span>`:''}${row.note?' — '+row.note:''}</td>
         <td><b>${PRODUCT_ICONS[row.name]||''} ${row.name}</b></td>
         <td></td>
         <td class="text-right" style="color:var(--red)">-${row.qty}</td>
@@ -2201,13 +2211,15 @@ function adjustDryStock(){
   const qty=parseInt(document.getElementById('da-qty').value)||0;
   const reason=document.getElementById('da-reason').value;
   const note=document.getElementById('da-note').value;
+  const orderId=document.getElementById('da-orderid').value.trim();
+  const reshipping=parseFloat(document.getElementById('da-reshipping').value)||0;
   if(!name||qty<=0){showNotif('กรุณากรอกข้อมูลให้ครบ','error');return;}
   const avail=S.stock[name]||0;
   if(qty>avail){showNotif(`สต็อก${name}เหลือแค่ ${avail} ถุง`,'error');return;}
 
-  // คำนวณต้นทุนตาม FIFO
+  // คำนวณต้นทุนตาม FIFO (รวมค่าส่งซ้ำ)
   const cpb=getFifoCost(name);
-  const totalCost=round2(cpb*qty);
+  const totalCost=round2(cpb*qty+reshipping);
 
   // ตัด soldBags ใน Lot แบบ FIFO
   const lots=S.dryLots.filter(l=>l.name===name&&(l.totalBags-l.soldBags)>0).sort(lotSort);
@@ -2227,7 +2239,7 @@ function adjustDryStock(){
   S.dryAdjustments.push({
     id:'da-'+Date.now(),
     date:new Date().toISOString().slice(0,10),
-    name,qty,reason,note,cpb,totalCost
+    name,qty,reason,note,cpb,totalCost,orderId,reshipping
   });
 
   recalcAllFifo();
@@ -2235,6 +2247,8 @@ function adjustDryStock(){
   document.getElementById('da-name').value='';
   document.getElementById('da-qty').value='';
   document.getElementById('da-note').value='';
+  document.getElementById('da-orderid').value='';
+  document.getElementById('da-reshipping').value='0';
   showNotif(`ปรับลด ${name} -${qty} ถุง (${reason}) ฿${totalCost.toFixed(2)} ✅`);
 }
 
