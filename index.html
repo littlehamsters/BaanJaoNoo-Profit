@@ -2139,7 +2139,7 @@ function renderManualList(){
   if(!list.length){tbody.innerHTML='<tr><td colspan="10"><div class="empty"><div class="ei">📝</div><p>ยังไม่มีข้อมูล</p></div></td></tr>';return;}
   tbody.innerHTML=list.map(s=>`<tr>
     <td>${s.date}</td>
-    <td>${s.stockCutoff===false?'<span class="badge" style="background:#e0e0e0;color:#666">📦 ไม่ตัดสต็อก</span>':`<span class="badge badge-pend">${s.platform}</span>`}</td>
+    <td><span class="badge badge-pend">${s.platform}</span>${s.stockCutoff===false?' <span class="badge" style="background:#e0e0e0;color:#666">📦 ไม่ตัดสต็อก</span>':''}</td>
     <td style="font-size:.78rem;max-width:180px;white-space:normal">${s.items.map(i=>`${PRODUCT_ICONS[i.name]||''}${i.name}×${i.qty}`).join(', ')}</td>
     <td class="text-right">฿${s.revenue.toFixed(2)}</td>
     <td class="text-right">฿${s.productCost.toFixed(2)}</td>
