@@ -290,6 +290,7 @@ tbody td{padding:10px 12px}
       <div class="upload-zone" onclick="document.getElementById('inp-csv').click()" id="zone-csv" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleDrop(event,'csv')">
         <div class="uz-icon">📋</div><div class="uz-text">คลิกหรือลากไฟล์มาวาง</div><div class="uz-sub">.csv จาก Orders</div>
       </div>
+      <div style="font-size:.75rem;color:var(--text2);margin-top:6px;text-align:center">อัพโหลดอย่างเดียวก็ได้ หรือทั้งคู่เพื่อได้ข้อมูลครบ</div>
       <input type="file" id="inp-csv" accept=".csv" style="display:none" onchange="loadCSV(this)">
       <div id="csv-status"></div>
     </div>
@@ -297,6 +298,7 @@ tbody td{padding:10px 12px}
       <div class="upload-zone" onclick="document.getElementById('inp-xlsx').click()" id="zone-xlsx" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleDrop(event,'xlsx')">
         <div class="uz-icon">📊</div><div class="uz-text">คลิกหรือลากไฟล์มาวาง</div><div class="uz-sub">.xlsx จาก Finance</div>
       </div>
+      <div style="font-size:.75rem;color:var(--text2);margin-top:6px;text-align:center">อัพโหลดอย่างเดียวก็ได้ หรือทั้งคู่เพื่อได้ข้อมูลครบ</div>
       <input type="file" id="inp-xlsx" accept=".xlsx" style="display:none" onchange="loadXLSX(this)">
       <div id="xlsx-status"></div>
     </div>
@@ -1206,8 +1208,9 @@ function getPackCost(qty,hasCorn6){
 }
 
 function tryPreview(){
-  if(!pendingXLSX)return;
-  const incMap={};pendingXLSX.forEach(r=>{const id=String(r['หมายเลขคำสั่งซื้อ/การปรับ']||'').trim();if(id)incMap[id]=r;});
+  if(!pendingCSV && !pendingXLSX)return;
+  const incMap={};
+  if(pendingXLSX) pendingXLSX.forEach(r=>{const id=String(r['หมายเลขคำสั่งซื้อ/การปรับ']||'').trim();if(id)incMap[id]=r;});
   const exMap={};S.orders.forEach(o=>exMap[o.id]=o);
   const orderMap={};
   if(pendingCSV){
