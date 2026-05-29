@@ -379,6 +379,9 @@ tbody td{padding:10px 12px}
       <select id="filter-status" onchange="renderOrders()" style="border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-family:'Noto Sans Thai',sans-serif;font-size:.85rem;background:#fff">
         <option value="">ทุกสถานะ</option><option value="เสร็จสมบูรณ์">เสร็จสมบูรณ์</option><option value="จัดส่งแล้ว">จัดส่งแล้ว</option><option value="ที่จะจัดส่ง">ที่จะจัดส่ง</option>
       </select>
+      <select id="filter-platform" onchange="renderOrders()" style="border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-family:'Noto Sans Thai',sans-serif;font-size:.85rem;background:#fff">
+        <option value="">ทุกช่องทาง</option><option value="tiktok">TikTok</option><option value="shopee">Shopee</option><option value="facebook">Facebook</option><option value="linoa">Line OA</option><option value="other">อื่นๆ</option>
+      </select>
       <input type="date" id="filter-date-from" onchange="renderOrders()" style="border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-family:'Noto Sans Thai',sans-serif;font-size:.85rem;background:#fff">
       <span style="color:var(--text2);font-size:.85rem">ถึง</span>
       <input type="date" id="filter-date-to" onchange="renderOrders()" style="border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-family:'Noto Sans Thai',sans-serif;font-size:.85rem;background:#fff">
@@ -386,7 +389,7 @@ tbody td{padding:10px 12px}
       <div id="order-count" style="font-size:.82rem;color:var(--text2)"></div>
     </div>
     <div class="card" style="padding:0;overflow:hidden">
-      <div class="tbl-wrap"><table><thead><tr><th>Order ID</th><th>วันที่</th><th>สถานะ</th><th>สินค้า</th><th class="text-right">ซอง</th><th class="text-right">รายได้</th><th class="text-right">ต้นทุน</th><th class="text-right">ค่าแพ็ค</th><th class="text-right">TikTok Fee</th><th class="text-right">กำไร</th><th class="text-right">Margin%</th></tr></thead><tbody id="orders-tbody"></tbody></table></div>
+      <div class="tbl-wrap"><table><thead><tr><th>Order ID</th><th>วันที่</th><th>ช่องทาง</th><th>สถานะ</th><th>สินค้า</th><th class="text-right">ซอง</th><th class="text-right">รายได้</th><th class="text-right">ต้นทุน</th><th class="text-right">ค่าแพ็ค</th><th class="text-right">TikTok Fee</th><th class="text-right">กำไร</th><th class="text-right">Margin%</th></tr></thead><tbody id="orders-tbody"></tbody></table></div>
     </div>
   </div>
 </div>
@@ -1588,12 +1591,30 @@ function renderOverview(){
 }
 
 function parseOrderDate(d){if(!d)return new Date(0);if(d.includes('/'))return new Date(d.split('/').reverse().join('-'));return new Date(d);}
-function clearOrderFilters(){document.getElementById('filter-status').value='';document.getElementById('filter-date-from').value='';document.getElementById('filter-date-to').value='';renderOrders();}
+function clearOrderFilters(){document.getElementById('filter-status').value='';document.getElementById('filter-platform').value='';document.getElementById('filter-date-from').value='';document.getElementById('filter-date-to').value='';renderOrders();}
+
+function getPlatformLabel(o){
+  if(!o.source || o.source==='tiktok') return {label:'🎵 TikTok', color:'#e05545'};
+  if(o.platform==='Shopee') return {label:'🛍️ Shopee', color:'#e8750a'};
+  return {label:'🏪 '+(o.platform||'อื่นๆ'), color:'var(--green)'};
+}
+
+function matchOrderPlatform(o, fp){
+  if(!fp) return true;
+  if(fp==='tiktok') return !o.source || o.source==='tiktok';
+  if(fp==='shopee') return o.platform==='Shopee';
+  if(fp==='facebook') return o.platform==='Facebook';
+  if(fp==='linoa') return o.platform==='Line OA';
+  if(fp==='other') return !!o.source && o.source!=='tiktok' && !['Shopee','Facebook','Line OA'].includes(o.platform);
+  return true;
+}
 
 function renderOrders(){
   const fs=document.getElementById('filter-status').value,ff=document.getElementById('filter-date-from').value,ft=document.getElementById('filter-date-to').value;
+  const fp=document.getElementById('filter-platform')?.value||'';
   let orders=[...S.orders,...(S.manualSales||[])];
   if(fs)orders=orders.filter(o=>o.status===fs);
+  if(fp)orders=orders.filter(o=>matchOrderPlatform(o,fp));
   if(ff)orders=orders.filter(o=>parseOrderDate(o.date)>=new Date(ff));
   if(ft)orders=orders.filter(o=>parseOrderDate(o.date)<=new Date(ft+'T23:59:59'));
   const sorted=[...orders].sort((a,b)=>parseOrderDate(b.date)-parseOrderDate(a.date));
@@ -1601,7 +1622,8 @@ function renderOrders(){
   document.getElementById('order-count').textContent=`${sorted.length} ออเดอร์ | รายได้ ฿${tr.toFixed(0)} | กำไร ฿${tp.toFixed(0)}`;
   document.getElementById('orders-tbody').innerHTML=sorted.map(o=>{
     const m=o.revenue>0?(o.profit/o.revenue*100):0;
-    return `<tr><td style="font-family:monospace;font-size:.75rem;color:var(--text2)">${o.id.slice(-8)}</td><td>${o.date}</td><td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td><td style="max-width:200px;white-space:normal;font-size:.78rem">${o.items.map(i=>`${PRODUCT_ICONS[i.name]||''}${i.name}×${i.qty}`).join(', ')}</td><td class="text-right">${o.totalQty}</td><td class="text-right">฿${o.revenue.toFixed(2)}</td><td class="text-right">฿${o.productCost.toFixed(2)}</td><td class="text-right">฿${o.packCost.toFixed(2)}</td><td class="text-right">฿${o.tiktokFee.toFixed(2)}</td><td class="text-right ${o.profit>=0?'profit-pos':'profit-neg'}">฿${o.profit.toFixed(2)}</td><td class="text-right">${m.toFixed(1)}%</td></tr>`;
+    const pl=getPlatformLabel(o);
+    return `<tr><td style="font-family:monospace;font-size:.75rem;color:var(--text2)">${o.id.slice(-8)}</td><td>${o.date}</td><td><span class="badge" style="background:${pl.color};color:#fff">${pl.label}</span></td><td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td><td style="max-width:200px;white-space:normal;font-size:.78rem">${o.items.map(i=>`${PRODUCT_ICONS[i.name]||''}${i.name}×${i.qty}`).join(', ')}</td><td class="text-right">${o.totalQty}</td><td class="text-right">฿${o.revenue.toFixed(2)}</td><td class="text-right">฿${o.productCost.toFixed(2)}</td><td class="text-right">฿${o.packCost.toFixed(2)}</td><td class="text-right">฿${o.tiktokFee.toFixed(2)}</td><td class="text-right ${o.profit>=0?'profit-pos':'profit-neg'}">฿${o.profit.toFixed(2)}</td><td class="text-right">${m.toFixed(1)}%</td></tr>`;
   }).join('');
 }
 
