@@ -1975,9 +1975,10 @@ function renderDeliveryRoundPicker(){
     return od===date && ['จัดส่งแล้ว','ที่จะจัดส่ง','เสร็จสมบูรณ์'].includes(o.status) && !assignedIds.has(o.id);
   });
 
-  // Manual orders — normalize date to YYYY-MM-DD
+  // Manual orders — ใช้ shippedDate ถ้ามี (Shopee), ไม่งั้น fallback เป็น date (FB/Line OA)
   const manOrders=(S.manualSales||[]).filter(o=>{
-    const od=o.date.includes('/')?o.date.split('/').reverse().join('-'):o.date;
+    const raw=o.shippedDate||o.date;
+    const od=raw.includes('/')?raw.slice(0,10).split('/').reverse().join('-'):raw.slice(0,10);
     return od===date && !assignedIds.has(o.id);
   });
 
