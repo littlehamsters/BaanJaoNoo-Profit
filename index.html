@@ -1406,7 +1406,7 @@ function tryShopeePreview(){
   pendingShopeeXLSX.forEach(r=>{
     const oid=String(r['หมายเลขคำสั่งซื้อ']||'').trim();
     const status=(r['สถานะการสั่งซื้อ']||'').trim();
-    if(!oid||status!=='สำเร็จแล้ว') return;
+    if(!oid||!['สำเร็จแล้ว','การจัดส่ง'].includes(status)) return;
     if(!orderMap[oid]){
       orderMap[oid]={
         id:oid,
@@ -1415,6 +1415,7 @@ function tryShopeePreview(){
         revenue:round2(parseFloat(r['ราคาสินค้าที่ชำระโดยผู้ซื้อ (THB)']||0)),
         commission:round2(Math.abs(parseFloat(r['ค่าคอมมิชชั่น']||0))),
         transFee:round2(Math.abs(parseFloat(r['Transaction Fee']||0))),
+        rawStatus:status,
         items:[]
       };
     }
@@ -1438,9 +1439,10 @@ function tryShopeePreview(){
     const shippedDt=o.shippedDate?new Date(o.shippedDate):null;
     const stockCutoff=!!(shippedDt && !isNaN(shippedDt.getTime()) && shippedDt>=cutoff);
     if(stockCutoff) cutoffCount++;
+    const mappedStatus=o.rawStatus==='การจัดส่ง'?'จัดส่งแล้ว':'เสร็จสมบูรณ์';
     pendingShopeeOrders.push({
       id:o.id, date:o.date, shippedDate:o.shippedDate||null,
-      platform:'Shopee', source:'shopee', status:'เสร็จสมบูรณ์',
+      platform:'Shopee', source:'shopee', status:mappedStatus,
       items:o.items, totalQty:tq, hasCorn6:hc,
       revenue:o.revenue, productCost, packCost,
       tiktokFee:fee, feePct:o.revenue>0?round2(fee/o.revenue*100):0, shippingCost:0,
@@ -1487,6 +1489,7 @@ function confirmShopeeImport(){
 
   // recalcAllFifo จะข้ามออเดอร์ stockCutoff=false อัตโนมัติ (ดู filter ใน recalcAllFifo)
   recalcAllFifo();
+  recalcDeliveryCosts();
   saveState();
 
   pendingShopeeXLSX=null; pendingShopeeOrders=null;
@@ -1662,54 +1665,74 @@ function calcDeliveryCost(orderCount){
   }
 }
 
-// คำนวณและ assign ค่าขนส่งให้ออเดอร์ใน batch โดยใช้ Shipped Time ± 60 นาที
-function calcDeliveryForOrders(orders){
+// คำนวณและ assign ค่าขนส่งให้ออเดอร์ใน batch
+// - ออเดอร์ที่มี shippedDate (TikTok, Shopee จัดส่งแล้ว) → group ±60 นาที
+// - ออเดอร์ที่มีเฉพาะวันที่ (manual FB/Line OA) → attach เข้ารอบใหญ่สุดของวันเดียวกัน
+//   ถ้าไม่มีรอบใด ๆ ในวันนั้น → ตั้งรอบใหม่จาก manuals ของวันนั้น
+function calcDeliveryForOrders(orders, manuals){
   const s=S.settings;
   const startDate=new Date(s.deliveryStart||'2026-05-23');
   const ROUND_GAP=60*60*1000; // 60 นาที
 
-  // กรองเฉพาะออเดอร์ที่มี shippedDate และหลัง startDate
-  const eligible=orders.filter(o=>{
-    if(!o.shippedDate)return false;
-    const d=parseDate(o.shippedDate);
-    return d>=startDate;
+  const tagged=[
+    ...(orders||[]).map(o=>({o,isManual:false})),
+    ...(manuals||[]).map(o=>({o,isManual:true}))
+  ];
+
+  const toDate=str=>new Date(str.includes('/')?str.split('/').reverse().join('-'):str);
+  const dateKey=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const strDateKey=str=>{const d=toDate(str);return dateKey(d);};
+
+  const withTime=[];
+  const dateOnly={};
+
+  tagged.forEach(({o,isManual})=>{
+    const ref=o.shippedDate||o.date;
+    if(!ref)return;
+    if(parseDate(ref)<startDate)return;
+    if(o.shippedDate){
+      const dt=toDate(o.shippedDate);
+      withTime.push({o,isManual,dt,dateKey:dateKey(dt)});
+    } else {
+      const k=strDateKey(o.date);
+      (dateOnly[k]=dateOnly[k]||[]).push({o,isManual});
+    }
   });
 
-  if(!eligible.length)return;
-
-  // Sort by shipped datetime
-  eligible.sort((a,b)=>{
-    const da=new Date(a.shippedDate.includes('/')?a.shippedDate.split('/').reverse().join('-'):a.shippedDate);
-    const db=new Date(b.shippedDate.includes('/')?b.shippedDate.split('/').reverse().join('-'):b.shippedDate);
-    return da-db;
-  });
-
-  // Group by round: ถ้า shippedDate ต่างกัน <= 60 นาที = รอบเดียวกัน
+  // Time-based ±60 นาที (TikTok/Shopee shippedDate)
+  withTime.sort((a,b)=>a.dt-b.dt);
   const rounds=[];
   let current=[];
-  eligible.forEach(o=>{
-    const dt=new Date(o.shippedDate.includes('/')?o.shippedDate.split('/').reverse().join('-'):o.shippedDate);
-    if(!current.length){
-      current.push({o,dt});
+  withTime.forEach(item=>{
+    if(!current.length || item.dt-current[current.length-1].dt<=ROUND_GAP){
+      current.push(item);
     } else {
-      const lastDt=current[current.length-1].dt;
-      if(dt-lastDt<=ROUND_GAP){
-        current.push({o,dt});
-      } else {
-        rounds.push(current);
-        current=[{o,dt}];
-      }
+      rounds.push(current);
+      current=[item];
     }
   });
   if(current.length)rounds.push(current);
 
+  // Attach manual date-only → รอบใหญ่สุดของวันเดียวกัน, ไม่มี → ตั้งรอบใหม่
+  Object.entries(dateOnly).forEach(([k,grp])=>{
+    const sameDay=rounds.filter(rnd=>rnd[0].dateKey===k);
+    if(sameDay.length){
+      sameDay.sort((a,b)=>b.length-a.length);
+      sameDay[0].push(...grp);
+    } else {
+      rounds.push(grp);
+    }
+  });
+
   // คำนวณค่าส่งต่อรอบ
   rounds.forEach(rnd=>{
+    if(!rnd.length)return;
     const count=rnd.length;
     const{costPerOrder}=calcDeliveryCost(count);
-    rnd.forEach(({o})=>{
+    rnd.forEach(({o,isManual})=>{
       o.deliveryCost=costPerOrder;
-      o.totalCost=round2(o.productCost+o.packCost+o.tiktokFee+costPerOrder);
+      const base=o.productCost+o.packCost+o.tiktokFee+costPerOrder;
+      o.totalCost=round2(isManual?base+(o.shippingCost||0):base);
       o.profit=round2(o.revenue-o.totalCost);
     });
   });
@@ -1717,7 +1740,7 @@ function calcDeliveryForOrders(orders){
 
 // Recalculate delivery costs for all existing orders
 function recalcDeliveryCosts(){
-  calcDeliveryForOrders(S.orders);
+  calcDeliveryForOrders(S.orders, S.manualSales);
   saveState();
 }
 
@@ -2151,7 +2174,7 @@ function saveManualSale(){
     if(useB)deductBoxFifo('B',1);
     else if(useAB)deductBoxFifo('AB',1);
   }
-  recalcAllFifo();saveState();renderManualList();renderDryStock();renderBoxStock();renderOverview();
+  recalcAllFifo();recalcDeliveryCosts();saveState();renderManualList();renderDryStock();renderBoxStock();renderOverview();
 
   // reset form
   manualItems=[];
@@ -2202,7 +2225,7 @@ function deleteManualSale(id){
     }
   }
   S.manualSales=(S.manualSales||[]).filter(s=>s.id!==id);
-  recalcAllFifo();saveState();renderManualList();renderDryStock();renderBoxStock();renderOverview();
+  recalcAllFifo();recalcDeliveryCosts();saveState();renderManualList();renderDryStock();renderBoxStock();renderOverview();
   showNotif('ลบแล้ว สต็อกปรับกลับแล้ว ✅');
 }
 
