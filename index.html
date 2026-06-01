@@ -1584,7 +1584,7 @@ function renderOverview(){
     else labelEl.textContent='';
   }
   const orders=allOrders;
-  const tr=orders.reduce((s,o)=>s+o.revenue,0),tc=orders.reduce((s,o)=>s+o.totalCost,0),tp=orders.reduce((s,o)=>s+(o.status==='เสร็จสมบูรณ์'?o.profit:0),0);
+  const tr=orders.reduce((s,o)=>s+o.revenue,0),tc=orders.reduce((s,o)=>s+o.totalCost,0),tp=orders.reduce((s,o)=>s+o.profit,0);
   const done=orders.filter(o=>o.status==='เสร็จสมบูรณ์');
   const dp=done.reduce((s,o)=>s+o.profit,0),margin=tr>0?(tp/tr*100):0;
   const sv=Object.entries(S.stock).reduce((s,[n,q])=>s+q*(getFifoCost(n)||0),0);
