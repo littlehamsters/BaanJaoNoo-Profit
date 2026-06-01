@@ -1237,16 +1237,30 @@ function processXLSXFile(file){
   r.onload=e=>{
     try{
       const wb=XLSX.read(e.target.result,{type:'array'});
-      // หา sheet ที่มีคอลัมน์ "หมายเลขคำสั่งซื้อ/การปรับ" (TikTok Income XLSX มักมี sheet สรุป + sheet รายละเอียด)
+      // Rebuild !ref ตาม cells จริง (กัน XLSX ที่ !ref ไม่ครอบทุกแถว)
+      const fixRef=s=>{
+        const keys=Object.keys(s).filter(k=>!k.startsWith('!'));
+        if(!keys.length)return s;
+        let maxR=0,maxC=0;
+        keys.forEach(k=>{
+          const m=k.match(/^([A-Z]+)(\d+)$/);if(!m)return;
+          const r=parseInt(m[2])-1;
+          let c=0;for(const ch of m[1])c=c*26+ch.charCodeAt(0)-64;c--;
+          if(r>maxR)maxR=r;if(c>maxC)maxC=c;
+        });
+        s['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:maxR,c:maxC}});
+        return s;
+      };
+      // หา sheet ที่มีคอลัมน์ "หมายเลขคำสั่งซื้อ/การปรับ"
       let ws=null,pickedSheet='';
       for(const sn of wb.SheetNames){
-        const s=wb.Sheets[sn];
+        const s=fixRef(wb.Sheets[sn]);
         const rows=XLSX.utils.sheet_to_json(s,{defval:'',raw:false});
         if(rows.length>0 && rows[0]['หมายเลขคำสั่งซื้อ/การปรับ']!==undefined){
           ws=s;pickedSheet=sn;break;
         }
       }
-      if(!ws){ws=wb.Sheets[wb.SheetNames[0]];pickedSheet=wb.SheetNames[0]+' (fallback)';}
+      if(!ws){ws=fixRef(wb.Sheets[wb.SheetNames[0]]);pickedSheet=wb.SheetNames[0]+' (fallback)';}
       // raw:false → preserve formatted text (กัน Order ID 18 หลักเพี้ยนจาก IEEE 754 precision loss)
       pendingXLSX=XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
       showFileReady('xlsx-status',file.name,`${pendingXLSX.length} แถว — sheet: ${pickedSheet}`);tryPreview();
@@ -1265,7 +1279,13 @@ function getPackCost(qty,hasCorn6){
 function tryPreview(){
   if(!pendingCSV && !pendingXLSX)return;
   const incMap={};
-  if(pendingXLSX) pendingXLSX.forEach(r=>{const id=String(r['หมายเลขคำสั่งซื้อ/การปรับ']||'').trim();if(id)incMap[id]=r;});
+  if(pendingXLSX) pendingXLSX.forEach(r=>{
+    // ใช้คอลัมน์แรกเป็น Order ID (ไม่ hardcode ชื่อ — กัน header เพี้ยน)
+    const keys=Object.keys(r);
+    const id=String(r[keys[0]]||'').trim();
+    if(!id||isNaN(id))return;
+    incMap[id]=r;
+  });
   const exMap={};S.orders.forEach(o=>exMap[o.id]=o);
   const orderMap={};
   if(pendingCSV){
@@ -1285,8 +1305,9 @@ function tryPreview(){
   Object.values(orderMap).forEach(o=>{
     // revenue: ดึงจาก Income ก่อน ถ้าไม่มีใช้ SKU Subtotal After Discount จาก CSV (sum ทุก row ของ order)
     const inc=incMap[o.id];
-    const fee=inc?round2(Math.abs(parseNum(inc['ค่าธรรมเนียมทั้งหมด']))):0;
-    const incRev=inc?round2(parseNum(inc['รายได้รวม'])):0;
+    const incKeys=inc?Object.keys(inc):[];
+    const fee=inc?round2(Math.abs(parseNum(inc[incKeys[13]]))):0;  // col 14 = ค่าธรรมเนียมทั้งหมด
+    const incRev=inc?round2(parseNum(inc[incKeys[6]])):0;          // col 7 = รายได้รวม
     if(inc&&fee>0)matchedFee++;
     let csvRev=0;
     if(!incRev&&pendingCSV){
