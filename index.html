@@ -1236,7 +1236,8 @@ function processXLSXFile(file){
   const r=new FileReader();
   r.onload=e=>{
     try{const wb=XLSX.read(e.target.result,{type:'array'}),ws=wb.Sheets['รายละเอียดคำสั่งซื้อ']||wb.Sheets[wb.SheetNames[0]];
-      pendingXLSX=XLSX.utils.sheet_to_json(ws,{defval:0});
+      // raw:false → preserve formatted text (กัน Order ID 18 หลักเพี้ยนจาก IEEE 754 precision loss)
+      pendingXLSX=XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
       showFileReady('xlsx-status',file.name,pendingXLSX.length+' ออเดอร์');tryPreview();
     }catch(err){showNotif('อ่าน XLSX ไม่ได้: '+err.message,'error');}
   };r.readAsArrayBuffer(file);
@@ -1267,13 +1268,15 @@ function tryPreview(){
       orderMap[oid].items.push({variation:r['Variation']||'',name,qty:parseInt(r['Quantity'])||1,costPerBag:getFifoCost(name)});
     });
   }
-  let newCount=0,dupCount=0,updateCount=0;
+  let newCount=0,dupCount=0,updateCount=0,matchedFee=0;
+  const parseNum=v=>parseFloat(String(v||'0').replace(/,/g,''))||0;
   pendingOrders=[];pendingUpdates=[];
   Object.values(orderMap).forEach(o=>{
     // revenue: ดึงจาก Income ก่อน ถ้าไม่มีใช้ SKU Subtotal After Discount จาก CSV (sum ทุก row ของ order)
     const inc=incMap[o.id];
-    const fee=inc?round2(Math.abs(parseFloat(inc['ค่าธรรมเนียมทั้งหมด'])||0)):0;
-    const incRev=inc?round2(parseFloat(inc['รายได้รวม'])||0):0;
+    const fee=inc?round2(Math.abs(parseNum(inc['ค่าธรรมเนียมทั้งหมด']))):0;
+    const incRev=inc?round2(parseNum(inc['รายได้รวม'])):0;
+    if(inc&&fee>0)matchedFee++;
     let csvRev=0;
     if(!incRev&&pendingCSV){
       // หาค่า Order Amount จาก row แรกของ order นี้ (ทุก row ใช้ค่าเดียวกัน)
@@ -1306,12 +1309,14 @@ function tryPreview(){
     const pc=round2(o.items.reduce((s,i)=>s+i.costPerBag*i.qty,0)),pk=getPackCostFifo(tq,hc,o.date),tc=round2(pc+pk+fee),pr=round2(rev-tc);
     pendingOrders.push({id:o.id,date:o.date,shippedDate:o.shippedDate||null,deliveredDate:o.deliveredDate||null,status:o.status,items:o.items,totalQty:tq,hasCorn6:hc,revenue:rev,productCost:pc,packCost:pk,tiktokFee:fee,deliveryCost:0,totalCost:tc,profit:pr});newCount++;
   });
-  if(!pendingCSV){Object.keys(incMap).forEach(id=>{const ex=exMap[id];if(ex&&ex.tiktokFee===0){const inc=incMap[id],fee=round2(Math.abs(parseFloat(inc['ค่าธรรมเนียมทั้งหมด'])||0)),rev=round2(parseFloat(inc['รายได้รวม'])||0);if(fee>0){const nc=round2(ex.productCost+ex.packCost+fee),np=round2((rev||ex.revenue)-nc);pendingUpdates.push({id,tiktokFee:fee,revenue:rev||ex.revenue,totalCost:nc,profit:np});updateCount++;}}});}
+  if(!pendingCSV){Object.keys(incMap).forEach(id=>{const ex=exMap[id];if(ex&&ex.tiktokFee===0){const inc=incMap[id],fee=round2(Math.abs(parseNum(inc['ค่าธรรมเนียมทั้งหมด']))),rev=round2(parseNum(inc['รายได้รวม']));if(fee>0){const nc=round2(ex.productCost+ex.packCost+fee),np=round2((rev||ex.revenue)-nc);pendingUpdates.push({id,tiktokFee:fee,revenue:rev||ex.revenue,totalCost:nc,profit:np});updateCount++;}}});}
+  const xlsxCount=pendingXLSX?pendingXLSX.length:0;
   document.getElementById('preview-stats').innerHTML=`
     <div class="stat-card"><div class="s-label">ออเดอร์ใหม่</div><div class="s-val s-green">${newCount}</div></div>
     <div class="stat-card"><div class="s-label">อัพเดท Fee</div><div class="s-val s-blue">${updateCount}</div></div>
     <div class="stat-card"><div class="s-label">ซ้ำ</div><div class="s-val s-accent">${dupCount}</div></div>
-    <div class="stat-card"><div class="s-label">รายได้ใหม่</div><div class="s-val s-blue">฿${pendingOrders.reduce((s,o)=>s+o.revenue,0).toFixed(0)}</div></div>`;
+    <div class="stat-card"><div class="s-label">รายได้ใหม่</div><div class="s-val s-blue">฿${pendingOrders.reduce((s,o)=>s+o.revenue,0).toFixed(0)}</div></div>
+    <div class="stat-card"><div class="s-label">Fee match (XLSX ${xlsxCount})</div><div class="s-val ${matchedFee>0?'s-green':'s-accent'}">${matchedFee}</div></div>`;
   const rows=[...pendingOrders.map(o=>`<tr><td style="font-family:monospace;font-size:.75rem">${o.id.slice(-8)}</td><td>${o.date}</td><td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td><td style="max-width:180px;white-space:normal;font-size:.78rem">${o.items.map(i=>`${i.name}×${i.qty}`).join(', ')}</td><td class="text-right">${o.totalQty}</td><td class="text-right">฿${o.revenue.toFixed(2)}</td><td class="text-right">฿${o.productCost.toFixed(2)}</td><td class="text-right">฿${o.packCost.toFixed(2)}</td><td class="text-right">฿${o.tiktokFee.toFixed(2)}</td><td class="text-right ${o.profit>=0?'profit-pos':'profit-neg'}">฿${o.profit.toFixed(2)}</td></tr>`),
     ...pendingUpdates.map(u=>{const ex=exMap[u.id];return `<tr style="background:rgba(45,111,164,.06)"><td style="font-family:monospace;font-size:.75rem">${u.id.slice(-8)}</td><td>${ex?.date||''}</td><td><span class="badge badge-done">อัพเดท Fee</span></td><td style="max-width:180px;white-space:normal;font-size:.78rem">${(ex?.items||[]).map(i=>`${i.name}×${i.qty}`).join(', ')}</td><td class="text-right">${ex?.totalQty||''}</td><td class="text-right">฿${u.revenue.toFixed(2)}</td><td class="text-right">฿${(ex?.productCost||0).toFixed(2)}</td><td class="text-right">฿${(ex?.packCost||0).toFixed(2)}</td><td class="text-right" style="color:var(--accent)">฿${u.tiktokFee.toFixed(2)}</td><td class="text-right ${u.profit>=0?'profit-pos':'profit-neg'}">฿${u.profit.toFixed(2)}</td></tr>`})];
   document.getElementById('preview-tbody').innerHTML=rows.join('');
