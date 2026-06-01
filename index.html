@@ -1584,7 +1584,7 @@ function renderOverview(){
     else labelEl.textContent='';
   }
   const orders=allOrders;
-  const tr=orders.reduce((s,o)=>s+o.revenue,0),tc=orders.reduce((s,o)=>s+o.totalCost,0),tp=orders.reduce((s,o)=>s+o.profit,0);
+  const tr=orders.reduce((s,o)=>s+o.revenue,0),tc=orders.reduce((s,o)=>s+o.totalCost,0),tp=orders.reduce((s,o)=>s+(o.status==='เสร็จสมบูรณ์'?o.profit:0),0);
   const done=orders.filter(o=>o.status==='เสร็จสมบูรณ์');
   const dp=done.reduce((s,o)=>s+o.profit,0),margin=tr>0?(tp/tr*100):0;
   const sv=Object.entries(S.stock).reduce((s,[n,q])=>s+q*(getFifoCost(n)||0),0);
@@ -1669,13 +1669,15 @@ function renderOrders(){
   if(ff)orders=orders.filter(o=>parseOrderDate(o.date)>=new Date(ff));
   if(ft)orders=orders.filter(o=>parseOrderDate(o.date)<=new Date(ft+'T23:59:59'));
   const sorted=[...orders].sort((a,b)=>parseOrderDate(b.date)-parseOrderDate(a.date));
-  const tr=sorted.reduce((s,o)=>s+o.revenue,0),tp=sorted.reduce((s,o)=>s+o.profit,0);
+  const tr=sorted.reduce((s,o)=>s+o.revenue,0),tp=sorted.reduce((s,o)=>s+(o.status==='เสร็จสมบูรณ์'?o.profit:0),0);
   document.getElementById('order-count').textContent=`${sorted.length} ออเดอร์ | รายได้ ฿${tr.toFixed(0)} | กำไร ฿${tp.toFixed(0)}`;
   document.getElementById('orders-tbody').innerHTML=sorted.map(o=>{
-    const m=o.revenue>0?(o.profit/o.revenue*100):0;
+    const done=o.status==='เสร็จสมบูรณ์';
+    const showProfit=done?o.profit:0;
+    const m=done&&o.revenue>0?(o.profit/o.revenue*100):0;
     const pl=getPlatformLabel(o);
     const delFn=o.source==='manual'||o.source==='shopee'?`deleteManualSale('${o.id}')`:`deleteTikTokOrder('${o.id}')`;
-    return `<tr><td style="font-family:monospace;font-size:.75rem;color:var(--text2)">${o.id.slice(-8)}</td><td>${o.date}</td><td><span class="badge" style="background:${pl.color};color:#fff">${pl.label}</span></td><td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td><td style="max-width:200px;white-space:normal;font-size:.78rem">${o.items.map(i=>`${PRODUCT_ICONS[i.name]||''}${i.name}×${i.qty}`).join(', ')}</td><td class="text-right">${o.totalQty}</td><td class="text-right">฿${o.revenue.toFixed(2)}</td><td class="text-right">฿${o.productCost.toFixed(2)}</td><td class="text-right">฿${o.packCost.toFixed(2)}</td><td class="text-right">฿${o.tiktokFee.toFixed(2)}</td><td class="text-right ${o.profit>=0?'profit-pos':'profit-neg'}">฿${o.profit.toFixed(2)}</td><td class="text-right">${m.toFixed(1)}%</td><td><button class="btn btn-danger btn-sm" onclick="${delFn}">ลบ</button></td></tr>`;
+    return `<tr><td style="font-family:monospace;font-size:.75rem;color:var(--text2)">${o.id.slice(-8)}</td><td>${o.date}</td><td><span class="badge" style="background:${pl.color};color:#fff">${pl.label}</span></td><td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td><td style="max-width:200px;white-space:normal;font-size:.78rem">${o.items.map(i=>`${PRODUCT_ICONS[i.name]||''}${i.name}×${i.qty}`).join(', ')}</td><td class="text-right">${o.totalQty}</td><td class="text-right">฿${o.revenue.toFixed(2)}</td><td class="text-right">฿${o.productCost.toFixed(2)}</td><td class="text-right">฿${o.packCost.toFixed(2)}</td><td class="text-right">฿${o.tiktokFee.toFixed(2)}</td><td class="text-right ${showProfit>=0?'profit-pos':'profit-neg'}">฿${showProfit.toFixed(2)}</td><td class="text-right">${m.toFixed(1)}%</td><td><button class="btn btn-danger btn-sm" onclick="${delFn}">ลบ</button></td></tr>`;
   }).join('');
 }
 
