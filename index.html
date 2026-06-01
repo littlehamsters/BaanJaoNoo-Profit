@@ -396,6 +396,7 @@ tbody td{padding:10px 12px}
       <span style="color:var(--text2);font-size:.85rem">ถึง</span>
       <input type="date" id="filter-date-to" onchange="renderOrders()" style="border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-family:'Noto Sans Thai',sans-serif;font-size:.85rem;background:#fff">
       <button class="btn btn-outline btn-sm" onclick="clearOrderFilters()">✕ ล้าง</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteFilteredOrders()">🗑️ ลบทั้งหมดที่ filter</button>
       <div id="order-count" style="font-size:.82rem;color:var(--text2)"></div>
     </div>
     <div class="card" style="padding:0;overflow:hidden">
@@ -1278,9 +1279,9 @@ function tryPreview(){
       // หาค่า Order Amount จาก row แรกของ order นี้ (ทุก row ใช้ค่าเดียวกัน)
       const csvRows=pendingCSV.filter(r=>String(r['Order ID']||'').trim()===o.id);
       if(csvRows.length>0){
-        const orderAmt=parseFloat(csvRows[0]['Order Amount']||0);
-        // Order Amount = ยอดที่ลูกค้าจ่ายจริง แต่รายได้ร้าน = SKU Subtotal After Discount รวม
-        const skuTotal=csvRows.reduce((s,r)=>s+parseFloat(r['SKU Subtotal After Discount']||0),0);
+        // รายได้ร้าน = SKU Subtotal Before Discount - SKU Seller Discount
+        // (TikTok คืน Platform Discount ให้ร้าน → ไม่ต้องหัก)
+        const skuTotal=csvRows.reduce((s,r)=>s+parseFloat(r['SKU Subtotal Before Discount']||0)-parseFloat(r['SKU Seller Discount']||0),0);
         csvRev=round2(skuTotal);
       }
     }
@@ -1639,6 +1640,42 @@ function renderOrders(){
     const delFn=o.source==='manual'||o.source==='shopee'?`deleteManualSale('${o.id}')`:`deleteTikTokOrder('${o.id}')`;
     return `<tr><td style="font-family:monospace;font-size:.75rem;color:var(--text2)">${o.id.slice(-8)}</td><td>${o.date}</td><td><span class="badge" style="background:${pl.color};color:#fff">${pl.label}</span></td><td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td><td style="max-width:200px;white-space:normal;font-size:.78rem">${o.items.map(i=>`${PRODUCT_ICONS[i.name]||''}${i.name}×${i.qty}`).join(', ')}</td><td class="text-right">${o.totalQty}</td><td class="text-right">฿${o.revenue.toFixed(2)}</td><td class="text-right">฿${o.productCost.toFixed(2)}</td><td class="text-right">฿${o.packCost.toFixed(2)}</td><td class="text-right">฿${o.tiktokFee.toFixed(2)}</td><td class="text-right ${o.profit>=0?'profit-pos':'profit-neg'}">฿${o.profit.toFixed(2)}</td><td class="text-right">${m.toFixed(1)}%</td><td><button class="btn btn-danger btn-sm" onclick="${delFn}">ลบ</button></td></tr>`;
   }).join('');
+}
+
+function deleteFilteredOrders(){
+  const fs=document.getElementById('filter-status').value,ff=document.getElementById('filter-date-from').value,ft=document.getElementById('filter-date-to').value;
+  const fp=document.getElementById('filter-platform')?.value||'';
+  let orders=[...S.orders,...(S.manualSales||[])];
+  if(fs)orders=orders.filter(o=>o.status===fs);
+  if(fp)orders=orders.filter(o=>matchOrderPlatform(o,fp));
+  if(ff)orders=orders.filter(o=>parseOrderDate(o.date)>=new Date(ff));
+  if(ft)orders=orders.filter(o=>parseOrderDate(o.date)<=new Date(ft+'T23:59:59'));
+  if(!orders.length){showNotif('ไม่มีออเดอร์ที่ตรงกับ filter','error');return;}
+  if(!confirm(`ลบ ${orders.length} ออเดอร์ที่ตรงกับ filter? สต็อกทั้งหมดจะถูกปรับกลับ\n(กดยืนยันอีกครั้งเพื่อยืนยัน)`))return;
+  if(!confirm(`ยืนยันลบ ${orders.length} ออเดอร์? ทำแล้วย้อนกลับไม่ได้`))return;
+  orders.forEach(o=>{
+    // คืนสต็อกถุงอบแห้ง (เว้น Shopee ที่ stockCutoff=false)
+    if(o.stockCutoff!==false){
+      o.items.forEach(i=>{if(S.stock[i.name]!==undefined)S.stock[i.name]=(S.stock[i.name]||0)+i.qty;});
+      // คืนกล่อง FIFO
+      const od=new Date(o.date.includes('/')?o.date.split('/').reverse().join('-'):o.date);
+      if(od>=BOX_FIFO_START&&o.totalQty>0){
+        const useB=o.hasCorn6||o.totalQty>=5;
+        const useAB=!useB&&o.totalQty>=3;
+        const type=useB?'B':useAB?'AB':null;
+        if(type){
+          const lot=(S.boxLots||[]).filter(l=>l.type===type&&(l.usedQty||0)>0).sort((a,b)=>b.date.localeCompare(a.date))[0];
+          if(lot)lot.usedQty=Math.max(0,(lot.usedQty||0)-1);
+        }
+      }
+    }
+  });
+  const ids=new Set(orders.map(o=>o.id));
+  S.orders=S.orders.filter(o=>!ids.has(o.id));
+  S.manualSales=(S.manualSales||[]).filter(o=>!ids.has(o.id));
+  recalcAllFifo();recalcDeliveryCosts();saveState();
+  renderOrders();renderDryStock();renderBoxStock();renderOverview();renderManualList();
+  showNotif(`ลบ ${orders.length} ออเดอร์แล้ว สต็อกปรับกลับแล้ว ✅`);
 }
 
 function deleteTikTokOrder(id){
