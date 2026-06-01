@@ -1235,10 +1235,21 @@ function parseCSVLine(line){
 function processXLSXFile(file){
   const r=new FileReader();
   r.onload=e=>{
-    try{const wb=XLSX.read(e.target.result,{type:'array'}),ws=wb.Sheets['รายละเอียดคำสั่งซื้อ']||wb.Sheets[wb.SheetNames[0]];
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      // หา sheet ที่มีคอลัมน์ "หมายเลขคำสั่งซื้อ/การปรับ" (TikTok Income XLSX มักมี sheet สรุป + sheet รายละเอียด)
+      let ws=null,pickedSheet='';
+      for(const sn of wb.SheetNames){
+        const s=wb.Sheets[sn];
+        const rows=XLSX.utils.sheet_to_json(s,{defval:'',raw:false});
+        if(rows.length>0 && rows[0]['หมายเลขคำสั่งซื้อ/การปรับ']!==undefined){
+          ws=s;pickedSheet=sn;break;
+        }
+      }
+      if(!ws){ws=wb.Sheets[wb.SheetNames[0]];pickedSheet=wb.SheetNames[0]+' (fallback)';}
       // raw:false → preserve formatted text (กัน Order ID 18 หลักเพี้ยนจาก IEEE 754 precision loss)
       pendingXLSX=XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
-      showFileReady('xlsx-status',file.name,pendingXLSX.length+' ออเดอร์');tryPreview();
+      showFileReady('xlsx-status',file.name,`${pendingXLSX.length} แถว — sheet: ${pickedSheet}`);tryPreview();
     }catch(err){showNotif('อ่าน XLSX ไม่ได้: '+err.message,'error');}
   };r.readAsArrayBuffer(file);
 }
