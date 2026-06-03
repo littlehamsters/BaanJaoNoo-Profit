@@ -1236,32 +1236,32 @@ function processXLSXFile(file){
   const r=new FileReader();
   r.onload=e=>{
     try{
-      const wb=XLSX.read(e.target.result,{type:'array'});
-      // Rebuild !ref ตาม cells จริง (กัน XLSX ที่ !ref ไม่ครอบทุกแถว)
+      // cellDates:true กัน date parse, raw:false กัน Order ID precision loss
+      const wb=XLSX.read(e.target.result,{type:'array',cellDates:false});
+      // Force-rebuild !ref จาก cell keys จริง (กัน TikTok XLSX ที่ !ref ผิด เช่น A1:X2 ทั้งที่มี 100+ แถว)
       const fixRef=s=>{
-        const keys=Object.keys(s).filter(k=>!k.startsWith('!'));
+        const keys=Object.keys(s).filter(k=>!/^!/.test(k));
         if(!keys.length)return s;
-        let maxR=0,maxC=0;
+        let minR=Infinity,maxR=0,minC=Infinity,maxC=0;
         keys.forEach(k=>{
-          const m=k.match(/^([A-Z]+)(\d+)$/);if(!m)return;
-          const r=parseInt(m[2])-1;
-          let c=0;for(const ch of m[1])c=c*26+ch.charCodeAt(0)-64;c--;
-          if(r>maxR)maxR=r;if(c>maxC)maxC=c;
+          const dec=XLSX.utils.decode_cell(k);
+          if(dec.r<minR)minR=dec.r;if(dec.r>maxR)maxR=dec.r;
+          if(dec.c<minC)minC=dec.c;if(dec.c>maxC)maxC=dec.c;
         });
-        s['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:maxR,c:maxC}});
+        s['!ref']=XLSX.utils.encode_range({s:{r:minR,c:minC},e:{r:maxR,c:maxC}});
         return s;
       };
-      // หา sheet ที่มีคอลัมน์ "หมายเลขคำสั่งซื้อ/การปรับ"
+      // หา sheet ที่มี Order ID column (คอลัมน์แรกเป็น "หมายเลขคำสั่งซื้อ/การปรับ")
       let ws=null,pickedSheet='';
       for(const sn of wb.SheetNames){
         const s=fixRef(wb.Sheets[sn]);
         const rows=XLSX.utils.sheet_to_json(s,{defval:'',raw:false});
-        if(rows.length>0 && rows[0]['หมายเลขคำสั่งซื้อ/การปรับ']!==undefined){
-          ws=s;pickedSheet=sn;break;
+        if(rows.length>0 && Object.values(rows[0])[0]!==undefined){
+          const firstKey=Object.keys(rows[0])[0];
+          if(firstKey.includes('หมายเลขคำสั่งซื้อ')){ws=s;pickedSheet=sn;break;}
         }
       }
       if(!ws){ws=fixRef(wb.Sheets[wb.SheetNames[0]]);pickedSheet=wb.SheetNames[0]+' (fallback)';}
-      // raw:false → preserve formatted text (กัน Order ID 18 หลักเพี้ยนจาก IEEE 754 precision loss)
       pendingXLSX=XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
       showFileReady('xlsx-status',file.name,`${pendingXLSX.length} แถว — sheet: ${pickedSheet}`);tryPreview();
     }catch(err){showNotif('อ่าน XLSX ไม่ได้: '+err.message,'error');}
