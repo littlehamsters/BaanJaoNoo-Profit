@@ -881,10 +881,12 @@ function renderFreshList(){
 }
 
 function deleteFreshAdjust(id){
-  if(!confirm('ลบรายการปรับลดนี้? สต็อกจะไม่ถูกคืน (เพราะหักแล้วจาก Lot โดยตรง)'))return;
+  const p=S.freshPurchases.find(x=>x.id===id);
+  if(!p)return;
+  if(!confirm(`⚠️ ลบบันทึกปรับลด?\n\n${p.name} -${p.qty} ${p.unit} (${p.note||'ปรับลด'})\n\nหมายเหตุ: สต็อกจะ ไม่ถูกคืน เพราะถูกหักออกจาก Lot ไปแล้ว\nลบแค่ประวัติบันทึกเท่านั้น`))return;
   S.freshPurchases=S.freshPurchases.filter(p=>p.id!==id);
   saveState();renderFreshList();renderFreshStockGrid();
-  showNotif('ลบบันทึกปรับลดแล้ว ✅');
+  showNotif('ลบบันทึกปรับลดแล้ว (สต็อกไม่เปลี่ยน) ✅');
 }
 
 // ===================== DRY LOT =====================
