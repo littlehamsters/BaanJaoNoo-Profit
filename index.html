@@ -127,8 +127,8 @@ tbody td{padding:10px 12px}
       </div>
       <div style="margin-top:14px"><button class="btn btn-outline" onclick="adjustFreshStock()">📉 ปรับลด</button></div>
     </div>
-    <div class="card"><div class="card-title"><span>📋</span>ประวัติการซื้อ</div>
-      <div class="tbl-wrap"><table><thead><tr><th>วันที่</th><th>ชื่อ</th><th>ราคา</th><th>จำนวน</th><th>เหลือ</th><th>สถานะ</th><th></th></tr></thead><tbody id="fresh-tbody"></tbody></table></div>
+    <div class="card"><div class="card-title"><span>📋</span>ประวัติการซื้อและปรับลด</div>
+      <div class="tbl-wrap"><table><thead><tr><th>วันที่</th><th>ชื่อ</th><th>ประเภท</th><th>ราคา/จำนวน</th><th>เหลือ</th><th>สถานะ</th><th></th></tr></thead><tbody id="fresh-tbody"></tbody></table></div>
     </div>
   </div>
   <div id="stock-dry" style="display:none">
@@ -802,15 +802,26 @@ function adjustFreshStock(){
   if(!name||qty<=0){showNotif('กรุณากรอกข้อมูล','error');return;}
   const avail=getFreshStock(name);
   if(qty>avail){showNotif(`สต็อก${name}เหลือแค่ ${avail.toFixed(1)} หน่วย`,'error');return;}
+  const unit=getFreshUnit(name)||'หน่วย';
+  // คำนวณต้นทุนที่ปรับลด (FIFO price ก่อน deduct)
+  const costPerUnit=calcFifoCost(name,qty)/qty||0;
+  const totalAdjCost=round2(costPerUnit*qty);
   deductFresh(name,qty);
   // Recalc pricePerUnit: ต้นทุนรวมที่เหลือ / จำนวนที่เหลือ
   const remLots=S.freshPurchases.filter(p=>p.name===name&&!p.isAdjust&&(p.qty-(p.usedQty||0))>0);
   const remQty=remLots.reduce((s,p)=>s+(p.qty-(p.usedQty||0)),0);
   const remCost=remLots.reduce((s,p)=>s+(p.qty-(p.usedQty||0))*p.pricePerUnit,0);
   if(remQty>0){const newPPU=round2(remCost/remQty);remLots.forEach(p=>{p.pricePerUnit=newPPU;});}
+  // บันทึก adjustment record ลงใน freshPurchases (isAdjust=true)
+  const today=new Date();
+  const dateStr=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  S.freshPurchases.push({
+    id:Date.now(),name,qty,unit,price:totalAdjCost,pricePerUnit:costPerUnit,
+    travel:0,note:reason,date:dateStr,isAdjust:true,usedQty:0
+  });
   saveState();renderFreshList();renderFreshStockGrid();
   document.getElementById('adj-name').value='';document.getElementById('adj-qty').value='';document.getElementById('adj-reason').value='';
-  showNotif(`ปรับลด ${name} -${qty} (${reason}) ต้นทุน/หน่วยอัพเดทแล้ว ✅`);
+  showNotif(`ปรับลด ${name} -${qty} ${unit} (${reason}) ต้นทุน ฿${totalAdjCost.toFixed(2)} ✅`);
 }
 
 function editFresh(id){
@@ -841,18 +852,39 @@ function renderFreshStockGrid(){
 
 function renderFreshList(){
   const tbody=document.getElementById('fresh-tbody');
-  const list=S.freshPurchases.filter(p=>!p.isAdjust).slice().reverse();
-  if(!list.length){tbody.innerHTML='<tr><td colspan="6"><div class="empty"><div class="ei">🥬</div><p>ยังไม่มีข้อมูล</p></div></td></tr>';return;}
+  const list=[...S.freshPurchases].sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+  if(!list.length){tbody.innerHTML='<tr><td colspan="7"><div class="empty"><div class="ei">🥬</div><p>ยังไม่มีข้อมูล</p></div></td></tr>';return;}
   tbody.innerHTML=list.map(p=>{
-    const rem=round2(p.qty-(p.usedQty||0)),pct=p.qty>0?(rem/p.qty*100):0;
+    if(p.isAdjust){
+      return `<tr style="background:rgba(220,50,50,.04)">
+        <td style="font-size:.82rem">${p.date}</td>
+        <td><b>${p.name}</b></td>
+        <td><span class="badge" style="background:#e55;color:#fff;font-size:.72rem">📉 ปรับลด</span></td>
+        <td class="text-right" style="color:var(--red)">-${p.qty} ${p.unit}<br><span style="font-size:.75rem;color:var(--text2)">฿${p.price.toFixed(2)} | ${p.note||''}</span></td>
+        <td>—</td>
+        <td>—</td>
+        <td><button class="btn btn-danger btn-sm" onclick="deleteFreshAdjust(${p.id})">ลบ</button></td>
+      </tr>`;
+    }
+    const rem=round2(p.qty-(p.usedQty||0));
     const col=rem<=0?'var(--red)':rem<p.qty*0.3?'var(--yellow)':'var(--green)';
-    return `<tr><td>${p.date}</td><td><b>${p.name}</b>${p.note?`<br><span style="font-size:.75rem;color:var(--text2)">${p.note}</span>`:''}</td>
-    <td class="text-right">฿${p.price.toFixed(2)}<br><span style="font-size:.75rem;color:var(--text2)">฿${p.pricePerUnit.toFixed(2)}/${p.unit}</span></td>
-    <td class="text-right">${p.qty} ${p.unit}</td>
-    <td class="text-right"><b style="color:${col}">${rem.toFixed(1)}</b> ${p.unit}</td>
-    <td><span class="badge ${rem<=0?'badge-done':rem<p.qty?'badge-ship':'badge-pend'}">${rem<=0?'หมด':rem<p.qty?'บางส่วน':'ยังไม่ใช้'}</span></td>
-    <td style="display:flex;gap:4px"><button class="btn btn-outline btn-sm" onclick="editFresh(${p.id})">✏️</button><button class="btn btn-danger" onclick="deleteFresh(${p.id})">ลบ</button></td></tr>`;
+    return `<tr>
+      <td style="font-size:.82rem">${p.date}</td>
+      <td><b>${p.name}</b>${p.note?`<br><span style="font-size:.75rem;color:var(--text2)">${p.note}</span>`:''}</td>
+      <td><span class="badge badge-pend" style="font-size:.72rem">🛒 ซื้อ</span></td>
+      <td class="text-right">฿${p.price.toFixed(2)}<br><span style="font-size:.75rem;color:var(--text2)">฿${p.pricePerUnit.toFixed(2)}/${p.unit} × ${p.qty}</span></td>
+      <td class="text-right"><b style="color:${col}">${rem.toFixed(1)}</b> ${p.unit}</td>
+      <td><span class="badge ${rem<=0?'badge-done':rem<p.qty?'badge-ship':'badge-pend'}">${rem<=0?'หมด':rem<p.qty?'บางส่วน':'ยังไม่ใช้'}</span></td>
+      <td style="display:flex;gap:4px"><button class="btn btn-outline btn-sm" onclick="editFresh(${p.id})">✏️</button><button class="btn btn-danger btn-sm" onclick="deleteFresh(${p.id})">ลบ</button></td>
+    </tr>`;
   }).join('');
+}
+
+function deleteFreshAdjust(id){
+  if(!confirm('ลบรายการปรับลดนี้? สต็อกจะไม่ถูกคืน (เพราะหักแล้วจาก Lot โดยตรง)'))return;
+  S.freshPurchases=S.freshPurchases.filter(p=>p.id!==id);
+  saveState();renderFreshList();renderFreshStockGrid();
+  showNotif('ลบบันทึกปรับลดแล้ว ✅');
 }
 
 // ===================== DRY LOT =====================
@@ -1710,12 +1742,37 @@ function deleteFilteredOrders(){
       }
     }
   });
-  const ids=new Set(orders.map(o=>o.id));
-  S.orders=S.orders.filter(o=>!ids.has(o.id));
-  S.manualSales=(S.manualSales||[]).filter(o=>!ids.has(o.id));
-  recalcAllFifo();recalcDeliveryCosts();saveState();
-  renderOrders();renderDryStock();renderBoxStock();renderOverview();renderManualList();
+  const ids=[...new Set(orders.map(o=>o.id))];
+  const idSet=new Set(ids);
+  S.orders=S.orders.filter(o=>!idSet.has(o.id));
+  S.manualSales=(S.manualSales||[]).filter(o=>!idSet.has(o.id));
+  removeFromDeliveryRounds(ids);
+  recalcAllFifo();saveState();
+  renderOrders();renderDryStock();renderBoxStock();renderOverview();renderManualList();renderDeliveryRounds();
   showNotif(`ลบ ${orders.length} ออเดอร์แล้ว สต็อกปรับกลับแล้ว ✅`);
+}
+
+// ลบ order IDs ออกจาก deliveryRounds — รอบที่ว่างเปล่าจะถูกลบ, รอบที่ยังมีออเดอร์จะ recalc costPerOrder
+function removeFromDeliveryRounds(ids){
+  const idSet=new Set(ids);
+  S.deliveryRounds=(S.deliveryRounds||[]).filter(r=>{
+    r.orderIds=r.orderIds.filter(x=>!idSet.has(x));
+    if(!r.orderIds.length)return false; // ลบรอบที่ไม่มีออเดอร์เหลือ
+    const{costPerTrip}=calcDeliveryCost(r.orderIds.length);
+    r.costPerOrder=round2(costPerTrip/r.orderIds.length);
+    r.count=r.orderIds.length;
+    // อัพเดท deliveryCost ของออเดอร์ที่เหลือในรอบ
+    r.orderIds.forEach(oid=>{
+      const o=S.orders.find(x=>x.id===oid)||(S.manualSales||[]).find(x=>x.id===oid);
+      if(!o)return;
+      const isManual=!!(S.manualSales||[]).find(x=>x.id===oid);
+      o.deliveryCost=r.costPerOrder;
+      const base=o.productCost+o.packCost+o.tiktokFee+r.costPerOrder;
+      o.totalCost=round2(isManual?base+(o.shippingCost||0):base);
+      o.profit=round2(o.revenue-o.totalCost);
+    });
+    return true;
+  });
 }
 
 function deleteTikTokOrder(id){
@@ -1736,8 +1793,9 @@ function deleteTikTokOrder(id){
     }
   }
   S.orders=S.orders.filter(x=>x.id!==id);
-  recalcAllFifo();recalcDeliveryCosts();saveState();
-  renderOrders();renderDryStock();renderBoxStock();renderOverview();
+  removeFromDeliveryRounds([id]);
+  recalcAllFifo();saveState();
+  renderOrders();renderDryStock();renderBoxStock();renderOverview();renderDeliveryRounds();
   showNotif('ลบแล้ว สต็อกปรับกลับแล้ว ✅');
 }
 
@@ -2327,7 +2385,8 @@ function deleteManualSale(id){
     }
   }
   S.manualSales=(S.manualSales||[]).filter(s=>s.id!==id);
-  recalcAllFifo();recalcDeliveryCosts();saveState();renderManualList();renderDryStock();renderBoxStock();renderOverview();
+  removeFromDeliveryRounds([id]);
+  recalcAllFifo();saveState();renderManualList();renderDryStock();renderBoxStock();renderOverview();renderDeliveryRounds();
   showNotif('ลบแล้ว สต็อกปรับกลับแล้ว ✅');
 }
 
