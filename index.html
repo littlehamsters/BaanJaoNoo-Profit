@@ -1226,7 +1226,11 @@ function deleteDryLot(id){
       S.pendingRemnants[lot.name].grams=round2(S.pendingRemnants[lot.name].grams+(lot.remnantGrams||0));
       S.pendingRemnants[lot.name].cost=round2(S.pendingRemnants[lot.name].cost+(lot.remnantCost||0));
     }
-    // คืน fresh stock
+    // คืน fresh stock — ถ้ามี Lot พี่น้อง (groupId เดียวกัน) ยังอยู่ → ไม่คืน เพราะ fresh ยังถูกใช้อยู่
+    if(lot.freshDesc && lot.groupId){
+      const siblingsExist=S.dryLots.some(l=>l.groupId===lot.groupId&&l.id!==lot.id);
+      if(siblingsExist) lot.freshDesc=null;
+    }
     if(lot.freshDesc){
       lot.freshDesc.split(',').forEach(part=>{
         const t=part.trim().split(' '),unit=t[t.length-1],qty=parseFloat(t[t.length-2]),name=t.slice(0,t.length-2).join(' ');
