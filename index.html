@@ -323,6 +323,7 @@ tbody td{padding:10px 12px}
       <div class="card"><div class="card-title"><span>🔍</span>Preview ก่อน Import</div>
         <div id="preview-stats" class="stat-row" style="margin-bottom:16px"></div>
         <div class="tbl-wrap"><table><thead><tr><th>Order ID</th><th>วันที่</th><th>สถานะ</th><th>สินค้า</th><th>ซอง</th><th>รายได้</th><th>ต้นทุน</th><th>ค่าแพ็ค</th><th>TikTok Fee</th><th>กำไร</th></tr></thead><tbody id="preview-tbody"></tbody></table></div>
+        <div id="preview-returns" style="display:none"></div>
         <div style="margin-top:16px;display:flex;gap:12px">
           <button class="btn btn-primary" onclick="confirmImport()">✅ ยืนยัน Import</button>
           <button class="btn btn-outline" onclick="cancelImport()">ยกเลิก</button>
@@ -512,6 +513,7 @@ async function saveToFirebase(){
       stock:S.stock||{},settings:S.settings||{},
       manualSales:S.manualSales||[],dryAdjustments:S.dryAdjustments||[],
       pendingRemnants:S.pendingRemnants||{},deliveryRounds:S.deliveryRounds||[],
+      orderReturns:S.orderReturns||[],boxAdjustments:S.boxAdjustments||[],
       updatedAt:new Date().toISOString()
     };
     await DATA_DOC.set(data);
@@ -620,6 +622,8 @@ function fixAndRecalc(){
   if(!S.dryAdjustments)S.dryAdjustments=[];
   if(!S.pendingRemnants)S.pendingRemnants={};
   if(!S.deliveryRounds)S.deliveryRounds=[];
+  if(!S.orderReturns)S.orderReturns=[];
+  if(!S.boxAdjustments)S.boxAdjustments=[];
   if(!S.boxLots)S.boxLots=JSON.parse(JSON.stringify(BOX_INITIAL_LOTS));
   // ตรวจสอบและเพิ่ม init lots ถ้าหาย
   Object.entries(INITIAL_STOCK).filter(([,q])=>q>0).forEach(([name,qty])=>{
@@ -1246,7 +1250,7 @@ function deleteDryLot(id){
 }
 
 // ===================== IMPORT =====================
-let pendingCSV=null,pendingXLSX=null,pendingOrders=null,pendingUpdates=null;
+let pendingCSV=null,pendingXLSX=null,pendingOrders=null,pendingUpdates=null,pendingReturns=null;
 
 function handleDrop(e,type){e.preventDefault();document.getElementById('zone-'+type).classList.remove('dragover');const f=e.dataTransfer.files[0];if(!f)return;type==='csv'?processCSVFile(f):processXLSXFile(f);}
 function loadCSV(inp){if(inp.files[0])processCSVFile(inp.files[0]);}
@@ -1326,10 +1330,16 @@ function tryPreview(){
   });
   const exMap={};S.orders.forEach(o=>exMap[o.id]=o);
   const orderMap={};
+  const returnStatusSet=['คืนสินค้า','คืนเงิน','ยกเลิก','Cancelled','Returned'];
+  const csvReturnMap={}; // oid → status ของออเดอร์ที่ถูกคืน/ยกเลิกใน CSV
   if(pendingCSV){
     pendingCSV.forEach(r=>{
       const oid=String(r['Order ID']||'').trim(),status=(r['Order Status']||'').trim();
-      if(!oid||!['เสร็จสมบูรณ์','จัดส่งแล้ว','ที่จะจัดส่ง'].includes(status))return;
+      if(!oid)return;
+      if(returnStatusSet.some(s=>status.includes(s))){
+        csvReturnMap[oid]=status; return;
+      }
+      if(!['เสร็จสมบูรณ์','จัดส่งแล้ว','ที่จะจัดส่ง'].includes(status))return;
       if(!orderMap[oid])orderMap[oid]={id:oid,status,date:(r['Created Time']||'').split(' ')[0].trim(),
         shippedDate:(r['Shipped Time']||'').trim().replace(/\\t/g,'')||null,
         deliveredDate:(r['Delivered Time']||'').trim().replace(/\\t/g,'')||null,items:[]};
@@ -1339,7 +1349,12 @@ function tryPreview(){
   }
   let newCount=0,dupCount=0,updateCount=0,matchedFee=0;
   const parseNum=v=>parseFloat(String(v||'0').replace(/,/g,''))||0;
-  pendingOrders=[];pendingUpdates=[];
+  pendingOrders=[];pendingUpdates=[];pendingReturns=[];
+  // detect คืน/ยกเลิกจาก CSV ที่มีออเดอร์อยู่ในระบบแล้วและยังไม่ถูก return
+  Object.entries(csvReturnMap).forEach(([oid,status])=>{
+    const ex=exMap[oid];
+    if(ex&&!ex.returned) pendingReturns.push({id:oid,status,existingOrder:ex});
+  });
   Object.values(orderMap).forEach(o=>{
     // revenue: ดึงจาก Income ก่อน ถ้าไม่มีใช้ SKU Subtotal After Discount จาก CSV (sum ทุก row ของ order)
     const inc=incMap[o.id];
@@ -1381,15 +1396,40 @@ function tryPreview(){
   });
   if(!pendingCSV){Object.keys(incMap).forEach(id=>{const ex=exMap[id];if(ex&&ex.tiktokFee===0){const inc=incMap[id],fee=round2(Math.abs(parseNum(inc['ค่าธรรมเนียมทั้งหมด']))),rev=round2(parseNum(inc['รายได้รวม']));if(fee>0){const nc=round2(ex.productCost+ex.packCost+fee),np=round2((rev||ex.revenue)-nc);pendingUpdates.push({id,tiktokFee:fee,revenue:rev||ex.revenue,totalCost:nc,profit:np});updateCount++;}}});}
   const xlsxCount=pendingXLSX?pendingXLSX.length:0;
+  const returnLossEst=round2(pendingReturns.reduce((s,r)=>s+(r.existingOrder.productCost||0)+(getFifoBoxCost((r.existingOrder.hasCorn6||r.existingOrder.totalQty>=5)?'B':(r.existingOrder.totalQty>=3)?'AB':null)||0),0));
   document.getElementById('preview-stats').innerHTML=`
     <div class="stat-card"><div class="s-label">ออเดอร์ใหม่</div><div class="s-val s-green">${newCount}</div></div>
     <div class="stat-card"><div class="s-label">อัพเดท Fee</div><div class="s-val s-blue">${updateCount}</div></div>
     <div class="stat-card"><div class="s-label">ซ้ำ</div><div class="s-val s-accent">${dupCount}</div></div>
     <div class="stat-card"><div class="s-label">รายได้ใหม่</div><div class="s-val s-blue">฿${pendingOrders.reduce((s,o)=>s+o.revenue,0).toFixed(0)}</div></div>
-    <div class="stat-card"><div class="s-label">Fee match (XLSX ${xlsxCount})</div><div class="s-val ${matchedFee>0?'s-green':'s-accent'}">${matchedFee}</div></div>`;
+    <div class="stat-card"><div class="s-label">Fee match (XLSX ${xlsxCount})</div><div class="s-val ${matchedFee>0?'s-green':'s-accent'}">${matchedFee}</div></div>
+    ${pendingReturns.length>0?`<div class="stat-card" style="border:1.5px solid var(--red)"><div class="s-label">↩ คืน/ยกเลิก</div><div class="s-val s-red">${pendingReturns.length} ออเดอร์</div><div class="s-sub">ขาดทุนประมาณ ฿${returnLossEst.toFixed(0)}</div></div>`:''}`;
   const rows=[...pendingOrders.map(o=>`<tr><td style="font-family:monospace;font-size:.75rem">${o.id.slice(-8)}</td><td>${o.date}</td><td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td><td style="max-width:180px;white-space:normal;font-size:.78rem">${o.items.map(i=>`${i.name}×${i.qty}`).join(', ')}</td><td class="text-right">${o.totalQty}</td><td class="text-right">฿${o.revenue.toFixed(2)}</td><td class="text-right">฿${o.productCost.toFixed(2)}</td><td class="text-right">฿${o.packCost.toFixed(2)}</td><td class="text-right">฿${o.tiktokFee.toFixed(2)}</td><td class="text-right ${o.profit>=0?'profit-pos':'profit-neg'}">฿${o.profit.toFixed(2)}</td></tr>`),
     ...pendingUpdates.map(u=>{const ex=exMap[u.id];return `<tr style="background:rgba(45,111,164,.06)"><td style="font-family:monospace;font-size:.75rem">${u.id.slice(-8)}</td><td>${ex?.date||''}</td><td><span class="badge badge-done">อัพเดท Fee</span></td><td style="max-width:180px;white-space:normal;font-size:.78rem">${(ex?.items||[]).map(i=>`${i.name}×${i.qty}`).join(', ')}</td><td class="text-right">${ex?.totalQty||''}</td><td class="text-right">฿${u.revenue.toFixed(2)}</td><td class="text-right">฿${(ex?.productCost||0).toFixed(2)}</td><td class="text-right">฿${(ex?.packCost||0).toFixed(2)}</td><td class="text-right" style="color:var(--accent)">฿${u.tiktokFee.toFixed(2)}</td><td class="text-right ${u.profit>=0?'profit-pos':'profit-neg'}">฿${u.profit.toFixed(2)}</td></tr>`})];
   document.getElementById('preview-tbody').innerHTML=rows.join('');
+  // แสดง section คืน/ยกเลิก
+  const retEl=document.getElementById('preview-returns');
+  if(retEl){
+    if(pendingReturns.length>0){
+      retEl.style.display='';
+      retEl.innerHTML=`<div style="font-weight:700;color:var(--red);margin:16px 0 8px">↩ ออเดอร์ที่ถูกคืน/ยกเลิก (${pendingReturns.length})</div>
+      <div class="tbl-wrap"><table><thead><tr><th>Order ID</th><th>วันที่</th><th>สถานะใหม่</th><th>สินค้า</th><th class="text-right">รายได้ที่หัก</th><th>สภาพสินค้า</th></tr></thead><tbody>
+      ${pendingReturns.map(r=>{const o=r.existingOrder;return `<tr style="background:rgba(220,50,50,.05)">
+        <td style="font-family:monospace;font-size:.75rem">${r.id.slice(-8)}</td>
+        <td>${o.date||''}</td>
+        <td><span class="badge" style="background:var(--red);color:#fff;font-size:.72rem">${r.status}</span></td>
+        <td style="font-size:.78rem;max-width:160px;white-space:normal">${(o.items||[]).map(i=>`${i.name}×${i.qty}`).join(', ')}</td>
+        <td class="text-right" style="color:var(--red)">฿${(o.revenue||0).toFixed(2)}</td>
+        <td><select data-return-id="${r.id}" style="font-size:.78rem;padding:4px 6px;border-radius:6px;border:1px solid var(--border)">
+          <option value="damaged" selected>⚠️ เสียหาย — ไม่คืนสต็อก</option>
+          <option value="good">✅ สภาพดี — คืนสต็อก</option>
+        </select></td>
+      </tr>`}).join('')}
+      </tbody></table></div>`;
+    } else {
+      retEl.style.display='none';retEl.innerHTML='';
+    }
+  }
   document.getElementById('import-preview').style.display='';
 }
 
@@ -1412,17 +1452,41 @@ function confirmImport(){
     }
   });
   (pendingUpdates||[]).forEach(u=>{const o=S.orders.find(x=>x.id===u.id);if(o){o.tiktokFee=u.tiktokFee;o.revenue=u.revenue;o.totalCost=u.totalCost;o.profit=u.profit;if(u.status)o.status=u.status;if(u.deliveredDate)o.deliveredDate=u.deliveredDate;}});
+  // จัดการออเดอร์คืน/ยกเลิก
+  const today=new Date().toISOString().slice(0,10);
+  if(!S.orderReturns)S.orderReturns=[];
+  if(!S.boxAdjustments)S.boxAdjustments=[];
+  (pendingReturns||[]).forEach(r=>{
+    const order=S.orders.find(x=>x.id===r.id);
+    if(!order||order.returned)return;
+    const condition=document.querySelector(`[data-return-id="${r.id}"]`)?.value||'damaged';
+    order.returned=true;order.returnDate=today;order.returnReason=r.status;order.returnCondition=condition;
+    // คืนสต็อกถุงอบแห้ง ถ้าสภาพดี
+    if(condition==='good'){
+      order.items.forEach(item=>{if(S.stock[item.name]!==undefined)S.stock[item.name]=(S.stock[item.name]||0)+item.qty;});
+    }
+    // กล่องเสียเสมอ — บันทึก boxAdjustment
+    const usedBoxType=(order.hasCorn6||order.totalQty>=5)?'B':(order.totalQty>=3)?'AB':null;
+    const boxCost=usedBoxType?getFifoBoxCost(usedBoxType):0;
+    if(usedBoxType&&boxCost>0){
+      S.boxAdjustments.push({id:'badj-'+Date.now()+Math.random().toString(36).slice(2,5),date:today,type:usedBoxType,qty:1,cost:boxCost,reason:'คืนออเดอร์',orderId:r.id});
+    }
+    S.orderReturns.push({id:'return-'+Date.now()+Math.random().toString(36).slice(2,5),orderId:r.id,date:today,reason:r.status,condition,items:order.items,revenue:order.revenue,productCost:order.productCost,boxType:usedBoxType,boxCost,totalLoss:condition==='good'?round2(boxCost):round2(order.productCost+boxCost)});
+  });
+  const returnCount=pendingReturns?.length||0;
   recalcAllFifo();
   recalcDeliveryCosts();
   saveState();
-  pendingCSV=null;pendingXLSX=null;pendingOrders=null;pendingUpdates=null;
+  pendingCSV=null;pendingXLSX=null;pendingOrders=null;pendingUpdates=null;pendingReturns=null;
   document.getElementById('import-preview').style.display='none';
   document.getElementById('csv-status').innerHTML='';document.getElementById('xlsx-status').innerHTML='';
   document.getElementById('inp-csv').value='';document.getElementById('inp-xlsx').value='';
-  showNotif(`เพิ่ม ${saved} ออเดอร์ | อัพเดท ${updated} fee ✅`);
+  const notifParts=[`เพิ่ม ${saved} ออเดอร์`,`อัพเดท ${updated} fee`];
+  if(returnCount>0)notifParts.push(`↩ คืน/ยกเลิก ${returnCount} ออเดอร์`);
+  showNotif(notifParts.join(' | ')+' ✅');
   renderDryStock();renderOverview();renderOrders();renderFreshStockGrid();
 }
-function cancelImport(){pendingCSV=null;pendingXLSX=null;pendingOrders=null;pendingUpdates=null;document.getElementById('import-preview').style.display='none';}
+function cancelImport(){pendingCSV=null;pendingXLSX=null;pendingOrders=null;pendingUpdates=null;pendingReturns=null;document.getElementById('import-preview').style.display='none';}
 
 // ===================== SHOPEE IMPORT =====================
 const SHOPEE_PRODUCT_NAMES=new Set(['แครอท','บล็อคโคลี่','ฟักทอง','แอปเปิ้ล','แตงกวา','บวบ','กล้วย','ข้าวโพด 3 แว่น']);
@@ -1607,6 +1671,7 @@ function renderOverview(){
 
   const allOrders=[...S.orders,...(S.manualSales||[])].filter(o=>{
     if(!o.date)return false;
+    if(o.returned)return false; // ออเดอร์ที่คืนแล้วไม่นับในภาพรวม
     const p=o.date.split('/');
     if(p.length!==3)return true;
     if(fyear&&p[2]!==fyear)return false;
@@ -1628,7 +1693,11 @@ function renderOverview(){
   const dr=done.reduce((s,o)=>s+o.revenue,0),margin=dr>0?(dp/dr*100):0;
   const sv=Object.entries(S.stock).reduce((s,[n,q])=>s+q*(getFifoCost(n)||0),0);
   const tiktokOrders=S.orders.length,manualOrders=(S.manualSales||[]).length;
-  const totalLoss=round2((S.dryAdjustments||[]).reduce((s,a)=>s+a.totalCost,0));
+  const dryLoss=round2((S.dryAdjustments||[]).reduce((s,a)=>s+a.totalCost,0));
+  const boxLoss=round2((S.boxAdjustments||[]).reduce((s,a)=>s+a.cost,0));
+  const totalLoss=round2(dryLoss+boxLoss);
+  const returnCount=(S.orderReturns||[]).length;
+  const returnLoss=round2((S.orderReturns||[]).reduce((s,r)=>s+r.totalLoss,0));
   const totalDeliveryTT=round2([...S.orders,...(S.manualSales||[])].reduce((s,o)=>s+(o.deliveryCost||0),0));
   const totalTravelFresh=round2(S.freshPurchases.filter(p=>!p.isAdjust).reduce((s,p)=>s+(p.travel||0),0));
   const totalTransport=round2(totalDeliveryTT+totalTravelFresh);
@@ -1639,7 +1708,8 @@ function renderOverview(){
     <div class="stat-card"><div class="s-label">กำไรเสร็จสมบูรณ์</div><div class="s-val s-green">฿${dp.toFixed(0)}</div><div class="s-sub">${done.length} ออเดอร์</div></div>
     <div class="stat-card"><div class="s-label">Margin เฉลี่ย</div><div class="s-val s-blue">${margin.toFixed(1)}%</div></div>
     <div class="stat-card"><div class="s-label">มูลค่าสต็อก</div><div class="s-val s-accent">฿${sv.toFixed(0)}</div><div class="s-sub">${Object.values(S.stock).reduce((s,v)=>s+v,0)} ถุง</div></div>
-    <div class="stat-card"><div class="s-label">ของสูญเสีย 🐹</div><div class="s-val s-red">฿${totalLoss.toFixed(0)}</div><div class="s-sub">${(S.dryAdjustments||[]).length} รายการ</div></div>
+    <div class="stat-card"><div class="s-label">ของสูญเสีย 🐹</div><div class="s-val s-red">฿${totalLoss.toFixed(0)}</div><div class="s-sub">ถุง ฿${dryLoss.toFixed(0)} | กล่อง ฿${boxLoss.toFixed(0)}</div></div>
+    ${returnCount>0?`<div class="stat-card"><div class="s-label">↩ คืนออเดอร์</div><div class="s-val s-red">฿${returnLoss.toFixed(0)}</div><div class="s-sub">${returnCount} ออเดอร์</div></div>`:''}
     <div class="stat-card"><div class="s-label">ค่าขนส่งรวม 🚗</div><div class="s-val s-red">฿${totalTransport.toFixed(0)}</div><div class="s-sub">ส่งออเดอร์ ฿${totalDeliveryTT.toFixed(0)} | ซื้อผัก ฿${totalTravelFresh.toFixed(0)}</div></div>`;
   const pd={};
   orders.forEach(o=>o.items.forEach(item=>{
@@ -1712,11 +1782,13 @@ function renderOrders(){
   document.getElementById('order-count').textContent=`${sorted.length} ออเดอร์ | รายได้ ฿${tr.toFixed(0)} | กำไร ฿${tp.toFixed(0)}`;
   document.getElementById('orders-tbody').innerHTML=sorted.map(o=>{
     const done=o.status==='เสร็จสมบูรณ์';
-    const showProfit=done?o.profit:0;
-    const m=done&&o.revenue>0?(o.profit/o.revenue*100):0;
+    const showProfit=done&&!o.returned?o.profit:0;
+    const m=done&&!o.returned&&o.revenue>0?(o.profit/o.revenue*100):0;
     const pl=getPlatformLabel(o);
     const delFn=o.source==='manual'||o.source==='shopee'?`deleteManualSale('${o.id}')`:`deleteTikTokOrder('${o.id}')`;
-    return `<tr><td style="font-family:monospace;font-size:.75rem;color:var(--text2)">${o.id.slice(-8)}</td><td>${o.date}</td><td><span class="badge" style="background:${pl.color};color:#fff">${pl.label}</span></td><td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td><td style="max-width:200px;white-space:normal;font-size:.78rem">${o.items.map(i=>`${PRODUCT_ICONS[i.name]||''}${i.name}×${i.qty}`).join(', ')}</td><td class="text-right">${o.totalQty}</td><td class="text-right">฿${o.revenue.toFixed(2)}</td><td class="text-right">฿${o.productCost.toFixed(2)}</td><td class="text-right">฿${o.packCost.toFixed(2)}</td><td class="text-right">฿${o.tiktokFee.toFixed(2)}</td><td class="text-right ${showProfit>=0?'profit-pos':'profit-neg'}">฿${showProfit.toFixed(2)}</td><td class="text-right">${m.toFixed(1)}%</td><td><button class="btn btn-danger btn-sm" onclick="${delFn}">ลบ</button></td></tr>`;
+    const returnedBadge=o.returned?` <span class="badge" style="background:var(--red);color:#fff;font-size:.7rem">↩ คืนแล้ว</span>`:'';
+    const profitStyle=o.returned?'text-decoration:line-through;opacity:.5':'';
+    return `<tr${o.returned?' style="opacity:.75"':''}><td style="font-family:monospace;font-size:.75rem;color:var(--text2)">${o.id.slice(-8)}</td><td>${o.date}</td><td><span class="badge" style="background:${pl.color};color:#fff">${pl.label}</span>${returnedBadge}</td><td><span class="badge ${statusBadge(o.status)}">${o.status}</span></td><td style="max-width:200px;white-space:normal;font-size:.78rem">${o.items.map(i=>`${PRODUCT_ICONS[i.name]||''}${i.name}×${i.qty}`).join(', ')}</td><td class="text-right">${o.totalQty}</td><td class="text-right">฿${o.revenue.toFixed(2)}</td><td class="text-right">฿${o.productCost.toFixed(2)}</td><td class="text-right">฿${o.packCost.toFixed(2)}</td><td class="text-right">฿${o.tiktokFee.toFixed(2)}</td><td class="text-right ${showProfit>=0?'profit-pos':'profit-neg'}" style="${profitStyle}">฿${showProfit.toFixed(2)}</td><td class="text-right">${m.toFixed(1)}%</td><td><button class="btn btn-danger btn-sm" onclick="${delFn}">ลบ</button></td></tr>`;
   }).join('');
 }
 
