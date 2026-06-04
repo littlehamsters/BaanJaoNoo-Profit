@@ -86,6 +86,7 @@ tbody td{padding:10px 12px}
 <div class="header"><div class="header-logo">🐹</div><div class="header-title">บ้านเจ้าหนู — ระบบวิเคราะห์กำไร</div>
 <div id="sync-status" style="font-size:.75rem;color:#a09070;font-family:'IBM Plex Mono',monospace;margin-left:12px">🔄 Connecting...</div>
 <div class="header-sub">TikTok Shop</div>
+<div id="build-info" style="font-size:.7rem;color:#a09070;font-family:'IBM Plex Mono',monospace;margin-left:8px">...</div>
 <button onclick="toggleDarkMode()" id="dark-btn" style="margin-left:auto;background:none;border:1px solid rgba(255,255,255,.3);color:#f7f5f0;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:.85rem;font-family:'Noto Sans Thai',sans-serif">🌙 Dark</button>
 </div>
 <nav class="nav">
@@ -2593,7 +2594,23 @@ window.addEventListener('load',function(){
   renderOverview();
   // แจ้งเตือนสต็อกต่ำ
   setTimeout(checkLowStock, 800);
+  loadBuildInfo();
 });
+
+function loadBuildInfo(){
+  fetch('https://api.github.com/repos/littlehamsters/BaanJaoNoo-Profit/commits/main')
+    .then(r=>r.json())
+    .then(d=>{
+      const hash=d.sha?.slice(0,7);
+      const date=d.commit?.committer?.date?.slice(0,10);
+      const el=document.getElementById('build-info');
+      if(el&&hash)el.textContent=`${date} #${hash}`;
+    })
+    .catch(()=>{
+      const el=document.getElementById('build-info');
+      if(el)el.textContent='';
+    });
+}
 
 function checkLowStock(){
   const warnings=[];
