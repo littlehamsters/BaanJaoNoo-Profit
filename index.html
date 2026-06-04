@@ -1834,7 +1834,9 @@ function calcDeliveryCost(orderCount){
 // - ออเดอร์ที่มี shippedDate (TikTok, Shopee จัดส่งแล้ว) → group ±60 นาที
 // - ออเดอร์ที่มีเฉพาะวันที่ (manual FB/Line OA) → attach เข้ารอบใหญ่สุดของวันเดียวกัน
 //   ถ้าไม่มีรอบใด ๆ ในวันนั้น → ตั้งรอบใหม่จาก manuals ของวันนั้น
-function calcDeliveryForOrders(orders, manuals){
+// newOnly=true → คำนวณเฉพาะออเดอร์ที่ deliveryCost===0 (ยังไม่เคย assign)
+// newOnly=false (default) → คำนวณทุกออเดอร์ (ใช้ตอนลบออเดอร์ออกจากรอบ)
+function calcDeliveryForOrders(orders, manuals, newOnly=true){
   const s=S.settings;
   const startDate=new Date(s.deliveryStart||'2026-05-23');
   const ROUND_GAP=60*60*1000; // 60 นาที
@@ -1842,7 +1844,7 @@ function calcDeliveryForOrders(orders, manuals){
   const tagged=[
     ...(orders||[]).map(o=>({o,isManual:false})),
     ...(manuals||[]).map(o=>({o,isManual:true}))
-  ];
+  ].filter(({o})=>!newOnly||(o.deliveryCost||0)===0); // freeze ถ้า newOnly=true
 
   const toDate=str=>new Date(str.includes('/')?str.split('/').reverse().join('-'):str);
   const dateKey=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
