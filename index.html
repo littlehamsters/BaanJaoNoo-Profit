@@ -986,6 +986,40 @@ function getCostWeight(item){
   return item.bags||0;
 }
 
+// แยกต้นทุนวัตถุดิบตาม ingredient จริง (แทนการ pool รวมแล้วหาร ratio ถุง)
+// คืน Map: output.name → { rawCost, elecCost }
+// - ต้นทุนวัตถุดิบ: ผูก output กลับไป fresh ingredient ผ่าน FRESH_TO_DRY
+//   ถ้า fresh เดียวผลิตหลาย output (ข้าวโพด → 3/6 แว่น) → หาร ratio เฉพาะใน group นั้น
+// - ค่าไฟ: หารตาม weight ถุงทั้งหมด (ใช้เตาร่วมกัน)
+function computeDryLotCosts(vf, vo, elec){
+  const freshCostMap={};
+  vf.forEach(i=>{freshCostMap[i.name]=calcFifoCost(i.name,i.qty).totalCost;});
+  const dryToFresh={};
+  Object.entries(FRESH_TO_DRY).forEach(([fresh,dryList])=>{dryList.forEach(d=>{dryToFresh[d.name]=fresh;});});
+  const totalWeight=vo.reduce((s,i)=>s+getCostWeight(i),0);
+  const rawCostTotal=round2(Object.values(freshCostMap).reduce((s,c)=>s+c,0));
+  const result={};
+  vo.forEach(item=>{
+    const sourceFresh=dryToFresh[item.name];
+    let rs;
+    if(!sourceFresh||freshCostMap[sourceFresh]===undefined){
+      // fallback: ratio เดิม
+      rs=round2(rawCostTotal*(totalWeight>0?getCostWeight(item)/totalWeight:1/vo.length));
+    } else {
+      const siblings=vo.filter(x=>dryToFresh[x.name]===sourceFresh);
+      if(siblings.length===1){
+        rs=round2(freshCostMap[sourceFresh]);
+      } else {
+        const sibW=siblings.reduce((s,x)=>s+getCostWeight(x),0);
+        rs=round2(freshCostMap[sourceFresh]*(sibW>0?getCostWeight(item)/sibW:1/siblings.length));
+      }
+    }
+    const es=round2(elec*(totalWeight>0?getCostWeight(item)/totalWeight:1/vo.length));
+    result[item.name]={rawCost:rs,elecCost:es};
+  });
+  return {costs:result,freshCostMap,rawCostTotal};
+}
+
 function getPendingRemnant(name){
   // เศษจาก Lot ที่ยังอยู่
   const fromLots=S.dryLots
@@ -1009,22 +1043,24 @@ function previewDryCost(){
   const div=document.getElementById('dry-preview');if(!div)return;
   const vf=freshInputItems.filter(i=>i.name&&i.qty>0);
   if(!vf.length||!dryOutputItems.length){div.style.display='none';return;}
-  let rawCost=0;vf.forEach(i=>{rawCost+=calcFifoCost(i.name,i.qty).totalCost;});rawCost=round2(rawCost);
-  const elec=round2(hours*S.settings.elec),total=rawCost+elec;
-  const tw=dryOutputItems.reduce((s,i)=>s+getCostWeight(i),0);
-  let html=`<b>ต้นทุนผักสด:</b> ฿${rawCost.toFixed(2)} + <b>ค่าไฟ:</b> ฿${elec.toFixed(2)} = <b>฿${total.toFixed(2)}</b><br><br>`;
+  const vo=dryOutputItems.filter(i=>i.name&&i.bags>0);
+  const elec=round2(hours*S.settings.elec);
+  const {costs,freshCostMap,rawCostTotal}=computeDryLotCosts(vf,vo,elec);
+  const total=round2(rawCostTotal+elec);
+  // แสดงต้นทุนวัตถุดิบแยกชนิด
+  const freshParts=Object.entries(freshCostMap).map(([n,c])=>`${n}: ฿${c.toFixed(2)}`).join(' | ');
+  let html=`<b>วัตถุดิบ:</b> ${freshParts}<br><b>รวมผักสด:</b> ฿${rawCostTotal.toFixed(2)} + <b>ค่าไฟ:</b> ฿${elec.toFixed(2)} = <b>฿${total.toFixed(2)}</b><br><br>`;
   html+='<div style="display:flex;gap:10px;flex-wrap:wrap">';
-  dryOutputItems.forEach(item=>{
-    if(!item.name||!item.bags)return;
-    const w=getCostWeight(item),ratio=tw>0?w/tw:1/dryOutputItems.length;
+  vo.forEach(item=>{
+    const c=costs[item.name]||{rawCost:0,elecCost:0};
     const bc=getBagCost(item.name),rem=getPendingRemnant(item.name);
     const sticker=S.settings.sticker||0;
     const bagOnly=round2(bc-sticker); // ค่าถุง+กันชื้น ไม่รวมสติ๊กเกอร์
-    const cpb=round2((total*ratio+rem.cost)/item.bags+bc);
-    const wlabel=item.name.includes('ข้าวโพด')?`${w}แว่น(${(ratio*100).toFixed(0)}%)`:`${item.bags}ถุง(${(ratio*100).toFixed(0)}%)`;
+    const cpb=round2((c.rawCost+c.elecCost+rem.cost)/item.bags+bc);
     html+=`<div style="background:#fff;border-radius:8px;padding:8px 12px;border:1px solid var(--border);min-width:160px">
       <b>${PRODUCT_ICONS[item.name]||''} ${item.name}</b><br>
-      <span style="font-size:.75rem;color:var(--text2)">${wlabel} | ถุง ฿${bagOnly.toFixed(2)} + 🏷️฿${sticker.toFixed(3)}</span><br>
+      <span style="font-size:.75rem;color:var(--text2)">ผัก ฿${c.rawCost.toFixed(2)} + ไฟ ฿${c.elecCost.toFixed(2)} | ${item.bags}ถุง</span><br>
+      <span style="font-size:.75rem;color:var(--text2)">ถุง ฿${bagOnly.toFixed(2)} + 🏷️฿${sticker.toFixed(3)}</span><br>
       <span style="color:var(--accent);font-weight:700;font-family:'IBM Plex Mono',monospace">฿${cpb.toFixed(2)}/ถุง</span>
     </div>`;
   });
@@ -1036,14 +1072,14 @@ function saveDryLot(){
   const vf=freshInputItems.filter(i=>i.name&&i.qty>0),vo=dryOutputItems.filter(i=>i.name&&i.bags>0);
   if(!date||!vf.length||!vo.length){showNotif('กรุณากรอกข้อมูลให้ครบ','error');return;}
   for(const fi of vf){const{shortage}=calcFifoCost(fi.name,fi.qty);if(shortage>0){showNotif(`สต็อก${fi.name}ไม่พอ`,'error');return;}}
-  let rawCost=0;vf.forEach(i=>{rawCost+=calcFifoCost(i.name,i.qty).totalCost;});rawCost=round2(rawCost);
-  const elec=round2(hours*S.settings.elec),total=rawCost+elec;
-  const tw=vo.reduce((s,i)=>s+getCostWeight(i),0),gid='lotg-'+Date.now();
+  const elec=round2(hours*S.settings.elec);
+  const {costs}=computeDryLotCosts(vf,vo,elec);
+  const gid='lotg-'+Date.now();
   const freshDesc=vf.map(i=>`${i.name} ${i.qty} ${i.unit||''}`).join(', ');
   vo.forEach(item=>{
-    const w=getCostWeight(item),ratio=tw>0?w/tw:1/vo.length;
     const bc=getBagCost(item.name),rem=getPendingRemnant(item.name);
-    const rs=round2(rawCost*ratio),es=round2(elec*ratio);
+    const c=costs[item.name]||{rawCost:0,elecCost:0};
+    const rs=c.rawCost,es=c.elecCost;
     const cpb=round2((rs+es+rem.cost)/item.bags+bc);
     const rg=item.remnantGrams||0,rc=rg>0?round2((rs+es)*(rg/(item.bags*10+rg))):0;
     S.dryLots.push({id:'lot-'+Date.now()+'-'+Math.random().toString(36).slice(2,5),groupId:gid,date,name:item.name,freshDesc,rawCost:rs,elecCost:es,bagCost:round2(bc),rawQty:freshDesc,remnantGrams:rg,remnantCost:rc,remnantUsed:false,totalBags:item.bags,soldBags:0,costPerBag:cpb});
