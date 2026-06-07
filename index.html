@@ -1750,13 +1750,34 @@ function renderOverview(){
   const dr=done.reduce((s,o)=>s+o.revenue,0),margin=dr>0?(dp/dr*100):0;
   const sv=Object.entries(S.stock).reduce((s,[n,q])=>s+q*(getFifoCost(n)||0),0);
   const tiktokOrders=S.orders.length,manualOrders=(S.manualSales||[]).length;
-  const dryLoss=round2((S.dryAdjustments||[]).reduce((s,a)=>s+a.totalCost,0));
-  const boxLoss=round2((S.boxAdjustments||[]).reduce((s,a)=>s+a.cost,0));
+  // ตัวกรองเดือน/ปีสำหรับ record ที่เก็บวันที่แบบ YYYY-MM-DD (adjustments, returns, freshPurchases)
+  const matchYM=ds=>{
+    if(!ds)return false;
+    const p=String(ds).split('-'); // YYYY-MM-DD
+    if(p.length<2)return true;
+    if(fyear&&p[0]!==fyear)return false;
+    if(fmonth&&p[1]!==fmonth)return false;
+    return true;
+  };
+  // ตัวกรองสำหรับ orders (DD/MM/YYYY) — รวมออเดอร์ที่คืนแล้วด้วย เพราะค่าส่งจ่ายจริง
+  const matchOrderYM=o=>{
+    if(!o.date)return false;
+    const p=o.date.split('/');
+    if(p.length!==3)return true;
+    if(fyear&&p[2]!==fyear)return false;
+    if(fmonth&&p[1]!==fmonth)return false;
+    return true;
+  };
+  const dryAdjF=(S.dryAdjustments||[]).filter(a=>matchYM(a.date));
+  const boxAdjF=(S.boxAdjustments||[]).filter(a=>matchYM(a.date));
+  const returnsF=(S.orderReturns||[]).filter(r=>matchYM(r.date));
+  const dryLoss=round2(dryAdjF.reduce((s,a)=>s+a.totalCost,0));
+  const boxLoss=round2(boxAdjF.reduce((s,a)=>s+a.cost,0));
   const totalLoss=round2(dryLoss+boxLoss);
-  const returnCount=(S.orderReturns||[]).length;
-  const returnLoss=round2((S.orderReturns||[]).reduce((s,r)=>s+r.totalLoss,0));
-  const totalDeliveryTT=round2([...S.orders,...(S.manualSales||[])].reduce((s,o)=>s+(o.deliveryCost||0),0));
-  const totalTravelFresh=round2(S.freshPurchases.filter(p=>!p.isAdjust).reduce((s,p)=>s+(p.travel||0),0));
+  const returnCount=returnsF.length;
+  const returnLoss=round2(returnsF.reduce((s,r)=>s+r.totalLoss,0));
+  const totalDeliveryTT=round2([...S.orders,...(S.manualSales||[])].filter(matchOrderYM).reduce((s,o)=>s+(o.deliveryCost||0),0));
+  const totalTravelFresh=round2(S.freshPurchases.filter(p=>!p.isAdjust&&matchYM(p.date)).reduce((s,p)=>s+(p.travel||0),0));
   const totalTransport=round2(totalDeliveryTT+totalTravelFresh);
   document.getElementById('overview-stats').innerHTML=`
     <div class="stat-card"><div class="s-label">รายได้รวม (${orders.length} ออเดอร์)</div><div class="s-val s-blue">฿${tr.toFixed(0)}</div><div class="s-sub">TikTok ${tiktokOrders} | อื่นๆ ${manualOrders}</div></div>
@@ -1765,7 +1786,7 @@ function renderOverview(){
     <div class="stat-card"><div class="s-label">กำไรเสร็จสมบูรณ์</div><div class="s-val s-green">฿${dp.toFixed(0)}</div><div class="s-sub">${done.length} ออเดอร์</div></div>
     <div class="stat-card"><div class="s-label">Margin เฉลี่ย</div><div class="s-val s-blue">${margin.toFixed(1)}%</div></div>
     <div class="stat-card"><div class="s-label">มูลค่าสต็อก</div><div class="s-val s-accent">฿${sv.toFixed(0)}</div><div class="s-sub">${Object.values(S.stock).reduce((s,v)=>s+v,0)} ถุง</div></div>
-    <div class="stat-card"><div class="s-label">ของสูญเสีย 🐹</div><div class="s-val s-red">฿${totalLoss.toFixed(0)}</div><div class="s-sub">ถุง ฿${dryLoss.toFixed(0)} | กล่อง ฿${boxLoss.toFixed(0)}</div></div>
+    <div class="stat-card"><div class="s-label">ของสูญเสีย 🐹</div><div class="s-val s-red">฿${totalLoss.toFixed(0)}</div><div class="s-sub">ถุง ฿${dryLoss.toFixed(0)} (${dryAdjF.length}) | กล่อง ฿${boxLoss.toFixed(0)} (${boxAdjF.length})</div></div>
     ${returnCount>0?`<div class="stat-card"><div class="s-label">↩ คืนออเดอร์</div><div class="s-val s-red">฿${returnLoss.toFixed(0)}</div><div class="s-sub">${returnCount} ออเดอร์</div></div>`:''}
     <div class="stat-card"><div class="s-label">ค่าขนส่งรวม 🚗</div><div class="s-val s-red">฿${totalTransport.toFixed(0)}</div><div class="s-sub">ส่งออเดอร์ ฿${totalDeliveryTT.toFixed(0)} | ซื้อผัก ฿${totalTravelFresh.toFixed(0)}</div></div>`;
   const pd={};
