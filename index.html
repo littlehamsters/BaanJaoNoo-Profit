@@ -1257,33 +1257,53 @@ function saveEditDryLot(id){
 }
 
 function deleteDryLot(id){
-  if(!confirm('ลบ Lot นี้? สต็อกจะถูกปรับกลับ'))return;
   const lot=S.dryLots.find(l=>l.id===id);
-  if(lot){
-    // ถ้ามีเศษที่ยังไม่ได้ใช้ → เก็บไว้ใน pendingRemnants
-    if((lot.remnantGrams||0)>0&&!lot.remnantUsed){
+  if(!lot)return;
+
+  // หา lots ทั้งหมดใน group เดียวกัน (ถ้าไม่มี groupId ลบแค่ตัวเอง)
+  const groupLots=lot.groupId
+    ? S.dryLots.filter(l=>l.groupId===lot.groupId&&!l.isInit)
+    : [lot];
+
+  const names=groupLots.map(l=>l.name).join(', ');
+  if(!confirm(`ลบ Lot ${names} (${groupLots.length} ชนิด) พร้อมกัน? สต็อกจะถูกปรับกลับ`))return;
+
+  groupLots.forEach(l=>{
+    // จัดการ remnant
+    if((l.remnantGrams||0)>0&&!l.remnantUsed){
       if(!S.pendingRemnants)S.pendingRemnants={};
-      if(!S.pendingRemnants[lot.name])S.pendingRemnants[lot.name]={grams:0,cost:0};
-      S.pendingRemnants[lot.name].grams=round2(S.pendingRemnants[lot.name].grams+(lot.remnantGrams||0));
-      S.pendingRemnants[lot.name].cost=round2(S.pendingRemnants[lot.name].cost+(lot.remnantCost||0));
+      if(!S.pendingRemnants[l.name])S.pendingRemnants[l.name]={grams:0,cost:0};
+      S.pendingRemnants[l.name].grams=round2(S.pendingRemnants[l.name].grams+(l.remnantGrams||0));
+      S.pendingRemnants[l.name].cost=round2(S.pendingRemnants[l.name].cost+(l.remnantCost||0));
     }
-    // คืน fresh stock — ถ้ามี Lot พี่น้อง (groupId เดียวกัน) ยังอยู่ → ไม่คืน เพราะ fresh ยังถูกใช้อยู่
-    if(lot.freshDesc && lot.groupId){
-      const siblingsExist=S.dryLots.some(l=>l.groupId===lot.groupId&&l.id!==lot.id);
-      if(siblingsExist) lot.freshDesc=null;
-    }
-    if(lot.freshDesc){
-      lot.freshDesc.split(',').forEach(part=>{
-        const t=part.trim().split(' '),unit=t[t.length-1],qty=parseFloat(t[t.length-2]),name=t.slice(0,t.length-2).join(' ');
-        if(!name||isNaN(qty)||qty<=0)return;
-        S.freshPurchases.filter(p=>p.name===name&&(p.usedQty||0)>0).sort((a,b)=>a.date.localeCompare(b.date)).forEach(p=>{
-          if(qty<=0)return;const take=Math.min(p.usedQty||0,qty);p.usedQty=round2((p.usedQty||0)-take);
+  });
+
+  // คืน fresh stock ครั้งเดียว (ใช้ freshDesc จาก lot แรกของ group)
+  const freshDesc=groupLots[0]?.freshDesc;
+  if(freshDesc){
+    freshDesc.split(',').forEach(part=>{
+      const t=part.trim().split(' '),unit=t[t.length-1],qty=parseFloat(t[t.length-2]),name=t.slice(0,t.length-2).join(' ');
+      if(!name||isNaN(qty)||qty<=0)return;
+      S.freshPurchases.filter(p=>p.name===name&&(p.usedQty||0)>0)
+        .sort((a,b)=>a.date.localeCompare(b.date))
+        .forEach(p=>{
+          const take=Math.min(p.usedQty||0,qty);
+          p.usedQty=round2((p.usedQty||0)-take);
         });
-      });
-    }
+    });
   }
-  S.dryLots=S.dryLots.filter(l=>l.id!==id);
-  recalcAllFifo();saveState();renderDryStock();renderDryLots();renderFreshList();renderFreshStockGrid();showNotif('ลบแล้ว สต็อกปรับกลับแล้ว ✅');
+
+  // ลบทุก lot ใน group ออกจาก S.dryLots
+  const groupIds=new Set(groupLots.map(l=>l.id));
+  S.dryLots=S.dryLots.filter(l=>!groupIds.has(l.id));
+
+  recalcAllFifo();
+  saveState();
+  renderDryStock();
+  renderDryLots();
+  renderFreshList();
+  renderFreshStockGrid();
+  showNotif(`ลบ ${groupLots.length} Lot แล้ว สต็อกปรับกลับแล้ว ✅`);
 }
 
 // ===================== IMPORT =====================
