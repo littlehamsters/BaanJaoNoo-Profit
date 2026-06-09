@@ -588,7 +588,27 @@ const DEFAULT_SETTINGS={costs:INITIAL_COSTS,pack1:1.30,pack2:2.35,pack3:2.95,ele
   fuel91:43.68,fuel95:44.05,motoKmpl:45.3,carKmpl:23.6,deliveryKm:4,carThreshold:14,deliveryStart:'2026-05-23',
   sticker:0.181,shopeeStockStart:'2026-05-29'};
 const FRESH_TO_DRY={'ข้าวโพด':[{name:'ข้าวโพด 3 แว่น',slicesPerBag:3},{name:'ข้าวโพด 6 แว่น',slicesPerBag:6}],'แครอท':[{name:'แครอท'}],'ฟักทอง':[{name:'ฟักทอง'}],'แอปเปิ้ล':[{name:'แอปเปิ้ล'}],'แตงกวา':[{name:'แตงกวา'}],'บล็อคโคลี่':[{name:'บล็อคโคลี่'}],'บวบ':[{name:'บวบ'}],'กล้วย':[{name:'กล้วย'}],'ส้มแมนดาริน':[{name:'ส้มแมนดาริน'}]};
-const VAR_MAP={'ข้าวโพด อบแห้ง 3 แว่น':'ข้าวโพด 3 แว่น','แครอท อบแห้ง':'แครอท','ฟักทอง อบแห้ง':'ฟักทอง','แอปเปิ้ล อบแห้ง':'แอปเปิ้ล','แตงกวา อบแห้ง':'แตงกวา','บล็อคโคลี่ อบแห้ง':'บล็อคโคลี่','บวบ อบแห้ง':'บวบ','กล้วย อบแห้ง':'กล้วย','ส้ม อบแห้ง':'ส้มแมนดาริน','ค่าเริ่มต้น':'ข้าวโพด 6 แว่น'};
+const VAR_MAP={'ข้าวโพด อบแห้ง 3 แว่น':'ข้าวโพด 3 แว่น','แครอท อบแห้ง':'แครอท','ฟักทอง อบแห้ง':'ฟักทอง','แอปเปิ้ล อบแห้ง':'แอปเปิ้ล','แตงกวา อบแห้ง':'แตงกวา','บล็อคโคลี่ อบแห้ง':'บล็อคโคลี่','บวบ อบแห้ง':'บวบ','กล้วย อบแห้ง':'กล้วย','ส้ม อบแห้ง':'ส้มแมนดาริน','ส้ม':'ส้มแมนดาริน','ค่าเริ่มต้น':'ข้าวโพด 6 แว่น'};
+// แปลงชื่อ Variation จาก TikTok → ชื่อสินค้าในระบบ — ทนทั้งรูปแบบเก่า ("แตงกวา อบแห้ง")
+// และใหม่ที่มีน้ำหนักกรัม ("แตงกวา 10g", "กล้วย 30g", "ส้ม 20g")
+function resolveVarName(v){
+  v=String(v||'').trim();
+  if(!v)return v;
+  if(VAR_MAP[v])return VAR_MAP[v];                       // 1. ชื่อที่ map ไว้ตรงตัว
+  const known=Object.keys(PRODUCT_ICONS);
+  if(known.includes(v))return v;                         // 2. ตรงชื่อสินค้าอยู่แล้ว (เช่น "ข้าวโพด 6 แว่น")
+  if(v.includes('ข้าวโพด')){                              // 3. ข้าวโพด: จับจำนวนแว่น
+    if(/6\s*แว่น/.test(v))return 'ข้าวโพด 6 แว่น';
+    if(/3\s*แว่น/.test(v))return 'ข้าวโพด 3 แว่น';
+  }
+  const noGram=v.replace(/\s*\d+(\.\d+)?\s*g\.?$/i,'').trim();  // 4. ตัดน้ำหนักกรัม
+  if(VAR_MAP[noGram])return VAR_MAP[noGram];
+  if(known.includes(noGram))return noGram;
+  const noDry=noGram.replace(/\s*อบแห้ง\s*/g,' ').trim();        // 5. ตัด "อบแห้ง"
+  if(VAR_MAP[noDry])return VAR_MAP[noDry];
+  if(known.includes(noDry))return noDry;
+  return v;                                              // fallback: ชื่อดิบ
+}
 
 // ===================== STATE =====================
 let S;
@@ -1400,7 +1420,7 @@ function tryPreview(){
       if(!orderMap[oid])orderMap[oid]={id:oid,status,date:(r['Created Time']||'').split(' ')[0].trim(),
         shippedDate:(r['Shipped Time']||'').trim().replace(/\\t/g,'')||null,
         deliveredDate:(r['Delivered Time']||'').trim().replace(/\\t/g,'')||null,items:[]};
-      const name=VAR_MAP[r['Variation']||'']||(r['Variation']||'');
+      const name=resolveVarName(r['Variation']||'');
       orderMap[oid].items.push({variation:r['Variation']||'',name,qty:parseInt(r['Quantity'])||1,costPerBag:getFifoCost(name)});
     });
   }
@@ -1447,7 +1467,7 @@ function tryPreview(){
       } else {dupCount++;}
       return;
     }
-    const tq=o.items.reduce((s,i)=>s+i.qty,0),hc=o.items.some(i=>i.variation==='ค่าเริ่มต้น');
+    const tq=o.items.reduce((s,i)=>s+i.qty,0),hc=o.items.some(i=>i.name==='ข้าวโพด 6 แว่น');
     const pc=round2(o.items.reduce((s,i)=>s+i.costPerBag*i.qty,0)),pk=getPackCostFifo(tq,hc,o.date),tc=round2(pc+pk+fee),pr=round2(rev-tc);
     pendingOrders.push({id:o.id,date:o.date,shippedDate:o.shippedDate||null,deliveredDate:o.deliveredDate||null,status:o.status,items:o.items,totalQty:tq,hasCorn6:hc,revenue:rev,productCost:pc,packCost:pk,tiktokFee:fee,deliveryCost:0,totalCost:tc,profit:pr});newCount++;
   });
