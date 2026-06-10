@@ -679,8 +679,10 @@ function recalcAllFifo(){
     lots.forEach(l=>{l.soldBags=0;});
 
     // ออเดอร์ขาย (TikTok + manual) — ข้ามออเดอร์ที่ stockCutoff=false (Shopee ก่อน cutoff date)
+    // คืนสภาพดี (returnCondition==='good') → ไม่นับเป็นการขาย → สต็อกคืนกลับ
+    // คืนแบบเสียหาย (damaged) → ยังนับเป็นการขาย → สต็อกไม่คืน (ของเสียไปแล้ว)
     const orders=[...S.orders,...(S.manualSales||[])]
-      .filter(o=>['เสร็จสมบูรณ์','จัดส่งแล้ว','ที่จะจัดส่ง'].includes(o.status)&&o.items.some(i=>i.name===name)&&o.stockCutoff!==false)
+      .filter(o=>['เสร็จสมบูรณ์','จัดส่งแล้ว','ที่จะจัดส่ง'].includes(o.status)&&o.items.some(i=>i.name===name)&&o.stockCutoff!==false&&!(o.returned&&o.returnCondition==='good'))
       .sort((a,b)=>parseDate(a.date)-parseDate(b.date));
     orders.forEach(o=>{
       let rem=o.items.filter(i=>i.name===name).reduce((s,i)=>s+i.qty,0);
@@ -860,9 +862,17 @@ function editFresh(id){
 }
 
 function deleteFresh(id){
-  if(!confirm('ลบ?'))return;
-  S.freshPurchases=S.freshPurchases.filter(p=>p.id!==id);
+  const p=S.freshPurchases.find(x=>x.id===id);
+  if(!p)return;
+  const used=round2(p.usedQty||0);
+  if(used>0){
+    if(!confirm(`⚠️ ${p.name} ล็อตนี้ถูกใช้อบไปแล้ว ${used} ${p.unit||''} (จาก ${p.qty})\n\nการลบจะทำให้ต้นทุน Lot อบแห้งที่ใช้ผักนี้คลาดเคลื่อน\nแนะนำ: แก้จำนวนแทนการลบ\n\nยืนยันลบ?`))return;
+  } else {
+    if(!confirm(`ลบ ${p.name} ${p.qty} ${p.unit||''}?`))return;
+  }
+  S.freshPurchases=S.freshPurchases.filter(x=>x.id!==id);
   saveState();renderFreshList();renderFreshStockGrid();
+  showNotif('ลบแล้ว ✅');
 }
 
 function renderFreshStockGrid(){
@@ -1179,20 +1189,8 @@ function renderDryLots(){
 
 function deleteAdjustment(id){
   if(!confirm('ลบรายการปรับลดนี้?'))return;
-  const adj=(S.dryAdjustments||[]).find(a=>a.id===id);
-  if(adj){
-    // คืนสต็อกและ soldBags กลับ
-    S.stock[adj.name]=(S.stock[adj.name]||0)+adj.qty;
-    // คืน soldBags จาก Lot ล่าสุดที่ถูกตัด
-    const lots=S.dryLots.filter(l=>l.name===adj.name&&l.soldBags>0).sort((a,b)=>parseDate(b.date)-parseDate(a.date));
-    let rem=adj.qty;
-    for(const lot of lots){
-      if(rem<=0)break;
-      const give=Math.min(lot.soldBags,rem);
-      lot.soldBags-=give;rem-=give;
-    }
-  }
   S.dryAdjustments=(S.dryAdjustments||[]).filter(a=>a.id!==id);
+  recalcAllFifo();  // rebuild soldBags + S.stock จากศูนย์ (FIFO ถูกต้อง)
   saveState();renderDryStock();renderDryLots();renderOverview();
   showNotif('ลบรายการปรับลดแล้ว ✅');
 }
@@ -1538,10 +1536,7 @@ function confirmImport(){
     if(!order||order.returned)return;
     const condition=document.querySelector(`[data-return-id="${r.id}"]`)?.value||'damaged';
     order.returned=true;order.returnDate=today;order.returnReason=r.status;order.returnCondition=condition;
-    // คืนสต็อกถุงอบแห้ง ถ้าสภาพดี
-    if(condition==='good'){
-      order.items.forEach(item=>{if(S.stock[item.name]!==undefined)S.stock[item.name]=(S.stock[item.name]||0)+item.qty;});
-    }
+    // สต็อกถุงอบแห้ง: recalcAllFifo() จะคืนให้เองถ้า condition==='good' (ดู filter ใน recalcAllFifo)
     // กล่องเสียเสมอ — บันทึก boxAdjustment
     const usedBoxType=(order.hasCorn6||order.totalQty>=5)?'B':(order.totalQty>=3)?'AB':null;
     const boxCost=usedBoxType?getFifoBoxCost(usedBoxType):0;
@@ -1922,6 +1917,9 @@ function deleteFilteredOrders(){
   const idSet=new Set(ids);
   S.orders=S.orders.filter(o=>!idSet.has(o.id));
   S.manualSales=(S.manualSales||[]).filter(o=>!idSet.has(o.id));
+  // ลบ record คืน/ขาดทุนกล่องที่ผูกกับออเดอร์ที่ลบ (กัน loss ผีค้าง)
+  S.orderReturns=(S.orderReturns||[]).filter(r=>!idSet.has(r.orderId));
+  S.boxAdjustments=(S.boxAdjustments||[]).filter(a=>!(a.reason==='คืนออเดอร์'&&idSet.has(a.orderId)));
   removeFromDeliveryRounds(ids);
   recalcAllFifo();saveState();
   renderOrders();renderDryStock();renderBoxStock();renderOverview();renderManualList();renderDeliveryRounds();
@@ -1969,6 +1967,9 @@ function deleteTikTokOrder(id){
     }
   }
   S.orders=S.orders.filter(x=>x.id!==id);
+  // ลบ record คืน/ขาดทุนกล่องที่ผูกกับออเดอร์นี้ (กัน loss ผีค้าง)
+  S.orderReturns=(S.orderReturns||[]).filter(r=>r.orderId!==id);
+  S.boxAdjustments=(S.boxAdjustments||[]).filter(a=>!(a.reason==='คืนออเดอร์'&&a.orderId===id));
   removeFromDeliveryRounds([id]);
   recalcAllFifo();saveState();
   renderOrders();renderDryStock();renderBoxStock();renderOverview();renderDeliveryRounds();
@@ -2563,6 +2564,9 @@ function deleteManualSale(id){
     }
   }
   S.manualSales=(S.manualSales||[]).filter(s=>s.id!==id);
+  // ลบ record คืน/ขาดทุนกล่องที่ผูกกับออเดอร์นี้ (กัน loss ผีค้าง)
+  S.orderReturns=(S.orderReturns||[]).filter(r=>r.orderId!==id);
+  S.boxAdjustments=(S.boxAdjustments||[]).filter(a=>!(a.reason==='คืนออเดอร์'&&a.orderId===id));
   removeFromDeliveryRounds([id]);
   recalcAllFifo();saveState();renderManualList();renderDryStock();renderBoxStock();renderOverview();renderDeliveryRounds();
   showNotif('ลบแล้ว สต็อกปรับกลับแล้ว ✅');
