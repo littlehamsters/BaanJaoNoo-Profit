@@ -654,6 +654,8 @@ function fixAndRecalc(){
   });
   if(!S.settings.sticker)S.settings.sticker=0.181;
   if(!S.settings.shopeeStockStart)S.settings.shopeeStockStart='2026-05-29';
+  // migrate: สถานะ Shopee เก่า "สำเร็จแล้ว" → "เสร็จสมบูรณ์"
+  [...(S.orders||[]),...(S.manualSales||[])].forEach(o=>{if(o.status==='สำเร็จแล้ว')o.status='เสร็จสมบูรณ์';});
   recalcAllFifo();
 }
 
