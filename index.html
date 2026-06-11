@@ -1618,7 +1618,11 @@ function tryShopeePreview(){
   pendingShopeeXLSX.forEach(r=>{
     const oid=String(r['หมายเลขคำสั่งซื้อ']||'').trim();
     const status=(r['สถานะการสั่งซื้อ']||'').trim();
-    if(!oid||!['สำเร็จแล้ว','การจัดส่ง'].includes(status)) return;
+    const isAccepted =
+      status === 'สำเร็จแล้ว' ||
+      status === 'การจัดส่ง' ||
+      status.includes('ผู้ซื้อได้รับสินค้าแล้ว');
+    if(!oid||!isAccepted) return;
     if(!orderMap[oid]){
       orderMap[oid]={
         id:oid,
@@ -1651,7 +1655,10 @@ function tryShopeePreview(){
     const shippedDt=o.shippedDate?new Date(o.shippedDate):null;
     const stockCutoff=!!(shippedDt && !isNaN(shippedDt.getTime()) && shippedDt>=cutoff);
     if(stockCutoff) cutoffCount++;
-    const mappedStatus=o.rawStatus==='การจัดส่ง'?'จัดส่งแล้ว':'เสร็จสมบูรณ์';
+    const mappedStatus=
+      o.rawStatus==='สำเร็จแล้ว'?'เสร็จสมบูรณ์':
+      o.rawStatus.includes('ผู้ซื้อได้รับสินค้าแล้ว')?'จัดส่งแล้ว':
+      'จัดส่งแล้ว'; // การจัดส่ง
     pendingShopeeOrders.push({
       id:o.id, date:o.date, shippedDate:o.shippedDate||null,
       platform:'Shopee', source:'shopee', status:mappedStatus,
