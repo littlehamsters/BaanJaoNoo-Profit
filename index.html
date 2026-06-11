@@ -1564,7 +1564,7 @@ function cancelImport(){pendingCSV=null;pendingXLSX=null;pendingOrders=null;pend
 
 // ===================== SHOPEE IMPORT =====================
 const SHOPEE_PRODUCT_NAMES=new Set(['แครอท','บล็อคโคลี่','ฟักทอง','แอปเปิ้ล','แตงกวา','บวบ','กล้วย','ข้าวโพด 3 แว่น']);
-let pendingShopeeXLSX=null, pendingShopeeOrders=null;
+let pendingShopeeXLSX=null, pendingShopeeOrders=null, pendingShopeeStatusUpdates=null;
 
 function getShopeeCutoffDate(){
   const s=(S.settings&&S.settings.shopeeStockStart)||'2026-05-29';
@@ -1614,7 +1614,8 @@ function processShopeeXLSXFile(file){
 function tryShopeePreview(){
   if(!pendingShopeeXLSX) return;
   const cutoff=getShopeeCutoffDate();
-  const existingIds=new Set((S.manualSales||[]).filter(s=>s.source==='shopee').map(s=>s.id));
+  const existingShopeeById={};
+  (S.manualSales||[]).filter(s=>s.source==='shopee').forEach(s=>{existingShopeeById[s.id]=s;});
   const orderMap={};
 
   pendingShopeeXLSX.forEach(r=>{
@@ -1643,10 +1644,25 @@ function tryShopeePreview(){
   });
 
   pendingShopeeOrders=[];
-  let newCount=0, dupCount=0, cutoffCount=0;
+  pendingShopeeStatusUpdates=[];
+  let newCount=0, dupCount=0, cutoffCount=0, updateCount=0;
 
   Object.values(orderMap).forEach(o=>{
-    if(existingIds.has(o.id)){dupCount++;return;}
+    const mappedStatus=
+      o.rawStatus==='สำเร็จแล้ว'?'เสร็จสมบูรณ์':
+      o.rawStatus.includes('ผู้ซื้อได้รับสินค้าแล้ว')?'จัดส่งแล้ว':
+      'จัดส่งแล้ว'; // การจัดส่ง
+    const existing=existingShopeeById[o.id];
+    if(existing){
+      // ออเดอร์เดิม — อัปเดตสถานะถ้า Shopee เปลี่ยนไป (เช่น จัดส่งแล้ว → เสร็จสมบูรณ์)
+      if(existing.status!==mappedStatus){
+        pendingShopeeStatusUpdates.push({id:o.id,date:existing.date,from:existing.status,to:mappedStatus,revenue:existing.revenue,profit:existing.profit});
+        updateCount++;
+      } else {
+        dupCount++;
+      }
+      return;
+    }
     const tq=o.items.reduce((s,i)=>s+i.qty,0);
     const hc=o.items.some(i=>i.name==='ข้าวโพด 6 แว่น');
     const productCost=round2(o.items.reduce((s,i)=>s+i.costPerBag*i.qty,0));
@@ -1657,10 +1673,6 @@ function tryShopeePreview(){
     const shippedDt=o.shippedDate?new Date(o.shippedDate):null;
     const stockCutoff=!!(shippedDt && !isNaN(shippedDt.getTime()) && shippedDt>=cutoff);
     if(stockCutoff) cutoffCount++;
-    const mappedStatus=
-      o.rawStatus==='สำเร็จแล้ว'?'เสร็จสมบูรณ์':
-      o.rawStatus.includes('ผู้ซื้อได้รับสินค้าแล้ว')?'จัดส่งแล้ว':
-      'จัดส่งแล้ว'; // การจัดส่ง
     pendingShopeeOrders.push({
       id:o.id, date:o.date, shippedDate:o.shippedDate||null,
       platform:'Shopee', source:'shopee', status:mappedStatus,
@@ -1674,20 +1686,31 @@ function tryShopeePreview(){
 
   document.getElementById('shopee-preview-stats').innerHTML=`
     <div class="stat-card"><div class="s-label">ออเดอร์ใหม่</div><div class="s-val s-green">${newCount}</div></div>
+    <div class="stat-card"><div class="s-label">อัพเดทสถานะ</div><div class="s-val s-accent">${updateCount}</div></div>
     <div class="stat-card"><div class="s-label">ซ้ำ</div><div class="s-val s-accent">${dupCount}</div></div>
     <div class="stat-card"><div class="s-label">ตัดสต็อก / ไม่ตัด</div><div class="s-val s-blue">${cutoffCount} / ${newCount-cutoffCount}</div></div>
     <div class="stat-card"><div class="s-label">รายได้ใหม่</div><div class="s-val s-blue">฿${pendingShopeeOrders.reduce((s,o)=>s+o.revenue,0).toFixed(0)}</div></div>`;
 
-  document.getElementById('shopee-preview-tbody').innerHTML=pendingShopeeOrders.map(o=>
-    `<tr><td style="font-family:monospace;font-size:.75rem">${o.id.slice(-8)}</td><td>${o.date}</td><td style="font-size:.75rem;color:var(--text2)">${o.shippedDate||'-'}</td><td style="max-width:180px;white-space:normal;font-size:.78rem">${o.items.map(i=>`${PRODUCT_ICONS[i.name]||''}${i.name}×${i.qty}`).join(', ')}</td><td class="text-right">${o.totalQty}</td><td class="text-right">฿${o.revenue.toFixed(2)}</td><td class="text-right">฿${o.tiktokFee.toFixed(2)}</td><td class="text-right ${o.profit>=0?'profit-pos':'profit-neg'}">฿${o.profit.toFixed(2)}</td><td style="text-align:center">${o.stockCutoff?'✅':'⏭️'}</td></tr>`
-  ).join('');
+  document.getElementById('shopee-preview-tbody').innerHTML=[
+    ...pendingShopeeStatusUpdates.map(u=>
+    `<tr style="background:rgba(45,111,164,.06)"><td style="font-family:monospace;font-size:.75rem">${u.id.slice(-8)}</td><td>${u.date||''}</td><td style="font-size:.75rem;color:var(--text2)">-</td><td style="max-width:180px;white-space:normal;font-size:.78rem"><span class="badge ${statusBadge(u.from)}">${u.from}</span> → <span class="badge ${statusBadge(u.to)}">${u.to}</span></td><td class="text-right">-</td><td class="text-right">฿${(u.revenue||0).toFixed(2)}</td><td class="text-right">-</td><td class="text-right ${(u.profit||0)>=0?'profit-pos':'profit-neg'}">฿${(u.profit||0).toFixed(2)}</td><td style="text-align:center">🔄</td></tr>`),
+    ...pendingShopeeOrders.map(o=>
+    `<tr><td style="font-family:monospace;font-size:.75rem">${o.id.slice(-8)}</td><td>${o.date}</td><td style="font-size:.75rem;color:var(--text2)">${o.shippedDate||'-'}</td><td style="max-width:180px;white-space:normal;font-size:.78rem">${o.items.map(i=>`${PRODUCT_ICONS[i.name]||''}${i.name}×${i.qty}`).join(', ')}</td><td class="text-right">${o.totalQty}</td><td class="text-right">฿${o.revenue.toFixed(2)}</td><td class="text-right">฿${o.tiktokFee.toFixed(2)}</td><td class="text-right ${o.profit>=0?'profit-pos':'profit-neg'}">฿${o.profit.toFixed(2)}</td><td style="text-align:center">${o.stockCutoff?'✅':'⏭️'}</td></tr>`)
+  ].join('');
 
   document.getElementById('import-shopee-preview').style.display='';
 }
 
 function confirmShopeeImport(){
   const saved=pendingShopeeOrders?.length||0;
+  const updated=pendingShopeeStatusUpdates?.length||0;
   if(!S.manualSales) S.manualSales=[];
+
+  // อัปเดตสถานะออเดอร์เดิมที่ Shopee เปลี่ยนไป
+  (pendingShopeeStatusUpdates||[]).forEach(u=>{
+    const o=S.manualSales.find(x=>x.source==='shopee'&&x.id===u.id);
+    if(o) o.status=u.to;
+  });
 
   (pendingShopeeOrders||[]).forEach(o=>{
     S.manualSales.push(o);
@@ -1713,17 +1736,17 @@ function confirmShopeeImport(){
   recalcDeliveryCosts();
   saveState();
 
-  pendingShopeeXLSX=null; pendingShopeeOrders=null;
+  pendingShopeeXLSX=null; pendingShopeeOrders=null; pendingShopeeStatusUpdates=null;
   document.getElementById('import-shopee-preview').style.display='none';
   document.getElementById('shopee-status').innerHTML='';
   document.getElementById('inp-shopee').value='';
 
-  showNotif(`Import Shopee ${saved} ออเดอร์ ✅`);
+  showNotif(`Import Shopee ${saved} ออเดอร์${updated?` · อัพเดท ${updated}`:''} ✅`);
   renderDryStock();renderOverview();renderManualList();renderBoxStock();
 }
 
 function cancelShopeeImport(){
-  pendingShopeeXLSX=null; pendingShopeeOrders=null;
+  pendingShopeeXLSX=null; pendingShopeeOrders=null; pendingShopeeStatusUpdates=null;
   document.getElementById('import-shopee-preview').style.display='none';
 }
 
