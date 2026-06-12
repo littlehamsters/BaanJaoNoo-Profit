@@ -436,11 +436,35 @@ tbody td{padding:10px 12px}
     <div class="card"><div class="card-title"><span>🛒</span>สินค้าที่มักซื้อคู่กัน (Top 5)</div><div id="cust-pairs"></div></div>
   </div>
   <div id="cust-people" style="display:none">
+    <div class="card"><div class="card-title"><span>📊</span>สัดส่วนลูกค้า</div>
+      <div id="cust-seg-stats" class="stat-row" style="margin-bottom:16px"></div>
+      <div class="chart-wrap" style="height:240px"><canvas id="cust-chart-seg"></canvas></div>
+    </div>
     <div id="cust-alerts" style="display:none"></div>
     <div class="card">
-      <div style="display:flex;gap:10px;margin-bottom:14px">
-        <input type="text" id="cust-search" placeholder="ค้นหาลูกค้า..." oninput="renderCustomerList()" style="flex:1;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-family:'Noto Sans Thai',sans-serif;font-size:.88rem;background:var(--bg);color:var(--text)">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
+        <input type="text" id="cust-search" placeholder="🔍 ค้นหาลูกค้า..." oninput="renderCustomerList()" style="flex:1;min-width:160px;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-family:'Noto Sans Thai',sans-serif;font-size:.88rem;background:var(--bg);color:var(--text)">
+        <select id="cust-filter-segment" onchange="renderCustomerList()" style="border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-family:'Noto Sans Thai',sans-serif;font-size:.85rem;background:var(--bg);color:var(--text)">
+          <option value="">ทุกกลุ่ม</option>
+          <option value="loyal">🥇 ประจำ (≥3 ครั้ง)</option>
+          <option value="repeat">🔄 ซื้อซ้ำ (2 ครั้ง)</option>
+          <option value="new">🆕 ใหม่ (1 ครั้ง)</option>
+          <option value="churn">💤 หายไปแล้ว (&gt;15 วัน)</option>
+        </select>
+        <select id="cust-filter-platform" onchange="renderCustomerList()" style="border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-family:'Noto Sans Thai',sans-serif;font-size:.85rem;background:var(--bg);color:var(--text)">
+          <option value="">ทุก Platform</option>
+          <option value="tiktok">🎵 TikTok</option>
+          <option value="shopee">🛍️ Shopee</option>
+          <option value="manual">✍️ Manual</option>
+        </select>
+        <select id="cust-sort" onchange="renderCustomerList()" style="border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-family:'Noto Sans Thai',sans-serif;font-size:.85rem;background:var(--bg);color:var(--text)">
+          <option value="total_desc">ยอดสะสม ↓</option>
+          <option value="orders_desc">จำนวนครั้ง ↓</option>
+          <option value="recent">ซื้อล่าสุด</option>
+          <option value="alert">⚠️ ใกล้รอบก่อน</option>
+        </select>
         <button class="btn btn-primary" onclick="openCustomerModal()">+ เพิ่มลูกค้า</button>
+        <div id="cust-count" style="font-size:.82rem;color:var(--text2);align-self:center"></div>
       </div>
       <div class="tbl-wrap"><table><thead><tr><th>ชื่อ</th><th>ชื่อเล่น</th><th>ช่องทาง</th><th class="text-right">ออเดอร์</th><th class="text-right">ยอดสะสม</th><th>ซื้อล่าสุด</th><th>รอบซื้อเฉลี่ย</th><th>สถานะ</th><th>ระดับ</th><th></th></tr></thead><tbody id="cust-tbody"></tbody></table></div>
     </div>
@@ -1620,6 +1644,9 @@ function confirmImport(){
     S.orderReturns.push({id:'return-'+Date.now()+Math.random().toString(36).slice(2,5),orderId:r.id,date:today,reason:r.status,condition,items:order.items,revenue:order.revenue,productCost:order.productCost,boxType:usedBoxType,boxCost,totalLoss:condition==='good'?round2(boxCost):round2(order.productCost+boxCost)});
   });
   const returnCount=pendingReturns?.length||0;
+  // sync ลูกค้า: อัปเดต lastSeen ออเดอร์เก่า + ใหม่ที่ import เข้ามา
+  const syncList=[...(pendingOrders||[]),...(pendingUpdates||[]).map(u=>S.orders.find(o=>o.id===u.id)).filter(Boolean)];
+  const custSync=syncCustomersFromImport(syncList);
   recalcAllFifo();
   recalcDeliveryCosts();
   saveState();
@@ -1629,6 +1656,8 @@ function confirmImport(){
   document.getElementById('inp-csv').value='';document.getElementById('inp-xlsx').value='';
   const notifParts=[`เพิ่ม ${saved} ออเดอร์`,`อัพเดท ${updated} fee`];
   if(returnCount>0)notifParts.push(`↩ คืน/ยกเลิก ${returnCount} ออเดอร์`);
+  if(custSync.knownCount>0)notifParts.push(`👥 ลูกค้าเก่า ${custSync.knownCount} คน`);
+  if(custSync.newCount>0)notifParts.push(`🆕 ใหม่ ${custSync.newCount} username`);
   showNotif(notifParts.join(' | ')+' ✅');
   renderDryStock();renderOverview();renderOrders();renderFreshStockGrid();
 }
@@ -1808,6 +1837,10 @@ function confirmShopeeImport(){
     }
   });
 
+  // sync ลูกค้า: อัปเดต lastSeen ออเดอร์เก่า + ใหม่ที่ import เข้ามา
+  const syncList=[...(pendingShopeeOrders||[]),...(pendingShopeeStatusUpdates||[]).map(u=>S.manualSales.find(x=>x.source==='shopee'&&x.id===u.id)).filter(Boolean)];
+  const custSync=syncCustomersFromImport(syncList);
+
   // recalcAllFifo จะข้ามออเดอร์ stockCutoff=false อัตโนมัติ (ดู filter ใน recalcAllFifo)
   recalcAllFifo();
   recalcDeliveryCosts();
@@ -1818,7 +1851,11 @@ function confirmShopeeImport(){
   document.getElementById('shopee-status').innerHTML='';
   document.getElementById('inp-shopee').value='';
 
-  showNotif(`Import Shopee ${saved} ออเดอร์${updated?` · อัพเดท ${updated}`:''} ✅`);
+  const sParts=[`Import Shopee ${saved} ออเดอร์`];
+  if(updated)sParts.push(`อัพเดท ${updated}`);
+  if(custSync.knownCount>0)sParts.push(`👥 ลูกค้าเก่า ${custSync.knownCount} คน`);
+  if(custSync.newCount>0)sParts.push(`🆕 ใหม่ ${custSync.newCount} username`);
+  showNotif(sParts.join(' · ')+' ✅');
   renderDryStock();renderOverview();renderManualList();renderBoxStock();
 }
 
@@ -2653,6 +2690,14 @@ function getCustomerOrders(cust){
 function customerBadge(n){return n>=3?'🥇 ประจำ':n>=2?'🔄 ซื้อซ้ำ':'🆕 ใหม่';}
 function customerBadgeClass(n){return n>=3?'badge-done':n>=2?'badge-ship':'badge-pend';}
 
+// วันที่ผ่านมาตั้งแต่ออเดอร์ล่าสุด — ใช้ได้แม้ลูกค้าซื้อครั้งเดียว (ต่างจาก getCustomerInsights ที่ต้อง ≥2)
+function getDaysSinceLast(cust){
+  const ds=getCustomerOrders(cust).map(o=>parseOrderDate(o.date)).filter(d=>d&&!isNaN(d.getTime())&&d.getTime()>0);
+  if(!ds.length) return null;
+  const last=new Date(Math.max(...ds.map(d=>d.getTime())));
+  return Math.round((new Date()-last)/(1000*60*60*24));
+}
+
 function getCustomerInsights(cust){
   const orders=getCustomerOrders(cust).slice().sort((a,b)=>parseOrderDate(a.date)-parseOrderDate(b.date));
   if(orders.length<2) return null;
@@ -2667,15 +2712,35 @@ function getCustomerInsights(cust){
   const lastOrder=parseOrderDate(orders[orders.length-1].date);
   const daysSinceLast=Math.round((new Date()-lastOrder)/(1000*60*60*24));
   const daysUntilNext=Math.max(0,Math.round(avgGap-daysSinceLast));
-  let status, statusColor;
-  if(daysSinceLast>avgGap*2){
-    status=`😴 ไม่กลับมา ${daysSinceLast} วันแล้ว`; statusColor='var(--red)';
+  const CHURN_DAYS=15;
+  let status, statusColor, showAlert;
+  if(daysSinceLast>CHURN_DAYS){
+    status=`💤 ไม่กลับมา ${daysSinceLast} วันแล้ว`; statusColor='var(--text2)'; showAlert=false;
   } else if(daysUntilNext<=3){
-    status=`⚠️ ใกล้ถึงรอบซื้อ (อีก ${daysUntilNext} วัน)`; statusColor='var(--yellow)';
+    status=`⚠️ ใกล้ถึงรอบซื้อ (อีก ${daysUntilNext} วัน)`; statusColor='var(--yellow)'; showAlert=true;
   } else {
-    status=`🔄 คาดว่าจะซื้อในอีก ${daysUntilNext} วัน`; statusColor='var(--green)';
+    status=`🔄 คาดว่าจะซื้อในอีก ${daysUntilNext} วัน`; statusColor='var(--green)'; showAlert=false;
   }
-  return {avgGap,gaps,daysSinceLast,daysUntilNext,status,statusColor,orders};
+  return {avgGap,gaps,daysSinceLast,daysUntilNext,status,statusColor,showAlert,orders};
+}
+
+// อัปเดต lastSeen ของลูกค้าเก่าที่ผูก username แล้ว, นับลูกค้าเก่า/username ใหม่
+function syncCustomersFromImport(orders){
+  const knownIds=new Set(), newUsernames=new Set();
+  const today=new Date().toISOString().slice(0,10);
+  (orders||[]).forEach(o=>{
+    if(!o||!o.buyerUsername) return;
+    const source = o.source==='shopee' ? 'shopee'
+      : o.source==='manual' ? (o.platform==='Shopee'?'shopee':'other')
+      : 'tiktok';
+    const linked=(S.customers||[]).find(c=>
+      (source==='tiktok'&&c.linkedUsernames?.tiktok===o.buyerUsername)||
+      (source==='shopee'&&c.linkedUsernames?.shopee===o.buyerUsername)
+    );
+    if(linked){ linked.lastSeen=today; knownIds.add(linked.id); }
+    else { newUsernames.add(o.buyerUsername); }
+  });
+  return {knownCount:knownIds.size, newCount:newUsernames.size};
 }
 
 // ---- Manual sale: customer search/select ----
@@ -2715,25 +2780,90 @@ function clearSelectedCustomer(){
 }
 
 // ---- Customer directory ----
+function getCustomerSegments(){
+  const CHURN_DAYS=15;
+  let newCount=0,repeatCount=0,loyalCount=0,churnCount=0,churnRepeatCount=0;
+  (S.customers||[]).forEach(c=>{
+    const orders=getCustomerOrders(c);
+    if(orders.length===0) return;
+    const lastOrderDays=getDaysSinceLast(c)??0; // นับลูกค้าซื้อครั้งเดียวด้วย
+    if(lastOrderDays>CHURN_DAYS){ churnCount++; if(orders.length>1) churnRepeatCount++; }
+    else if(orders.length>=3) loyalCount++;
+    else if(orders.length>=2) repeatCount++;
+    else newCount++;
+  });
+  return {newCount,repeatCount,loyalCount,churnCount,churnRepeatCount};
+}
+function renderCustomerSegments(){
+  const seg=getCustomerSegments();
+  const stat=document.getElementById('cust-seg-stats');
+  if(stat)stat.innerHTML=`
+    <div class="stat-card"><div class="s-label">🥇 ประจำ</div><div class="s-val" style="color:#d4a017">${seg.loyalCount} คน</div></div>
+    <div class="stat-card"><div class="s-label">🔄 ซื้อซ้ำ</div><div class="s-val s-green">${seg.repeatCount} คน</div></div>
+    <div class="stat-card"><div class="s-label">🆕 ใหม่</div><div class="s-val s-blue">${seg.newCount} คน</div></div>
+    <div class="stat-card"><div class="s-label">💤 หายไป</div><div class="s-val" style="color:#999">${seg.churnCount} คน</div>${seg.churnRepeatCount>0?`<div class="s-sub" style="color:var(--red)">ในนี้ซื้อซ้ำ ${seg.churnRepeatCount} คน — ควรตามกลับ</div>`:''}</div>`;
+  if(window._cwSeg)window._cwSeg.destroy();
+  const el=document.getElementById('cust-chart-seg');
+  const data=[seg.loyalCount,seg.repeatCount,seg.newCount,seg.churnCount];
+  if(el&&data.some(v=>v>0))window._cwSeg=new Chart(el,{type:'doughnut',data:{labels:['🥇 ประจำ','🔄 ซื้อซ้ำ','🆕 ใหม่','💤 หายไป'],datasets:[{data,backgroundColor:['#d4a017','#3a7c5c','#2d6fa4','#999']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{family:'Noto Sans Thai'}}}}}});
+}
 function renderCustomerList(){
   const tbody=document.getElementById('cust-tbody');if(!tbody)return;
-  const q=(document.getElementById('cust-search')?.value||'').trim().toLowerCase();
-  const list=(S.customers||[]).filter(c=>!q||(c.name||'').toLowerCase().includes(q)||(c.nickname||'').toLowerCase().includes(q)||(c.phone||'').includes(q));
-  if(!list.length){
-    tbody.innerHTML='<tr><td colspan="10"><div class="empty"><div class="ei">👤</div><p>ยังไม่มีลูกค้า — กด "+ เพิ่มลูกค้า" หรือผูกจาก username ด้านล่าง</p></div></td></tr>';
+  const search=(document.getElementById('cust-search')?.value||'').trim().toLowerCase();
+  const segFilter=document.getElementById('cust-filter-segment')?.value||'';
+  const platformFilter=document.getElementById('cust-filter-platform')?.value||'';
+  const sort=document.getElementById('cust-sort')?.value||'total_desc';
+  const CHURN_DAYS=15;
+  // enrich แต่ละลูกค้าครั้งเดียว
+  let rows=(S.customers||[]).map(c=>{
+    const orders=getCustomerOrders(c);
+    const insight=getCustomerInsights(c);
+    const total=orders.reduce((s,o)=>s+(o.revenue||0),0);
+    const last=orders.map(o=>parseOrderDate(o.date)).filter(d=>d&&!isNaN(d.getTime())&&d.getTime()>0).sort((a,b)=>b-a)[0];
+    const days=getDaysSinceLast(c)??0; // นับลูกค้าซื้อครั้งเดียวด้วย
+    return {c,orders,insight,total,last,days};
+  });
+  // filters
+  rows=rows.filter(({c,orders,days})=>{
+    if(search && !(c.name||'').toLowerCase().includes(search) && !(c.nickname||'').toLowerCase().includes(search)) return false;
+    if(segFilter){
+      const n=orders.length;
+      if(segFilter==='loyal' && (n<3||days>CHURN_DAYS)) return false;
+      if(segFilter==='repeat' && (n!==2||days>CHURN_DAYS)) return false;
+      if(segFilter==='new' && (n!==1||days>CHURN_DAYS)) return false;
+      if(segFilter==='churn' && days<=CHURN_DAYS) return false;
+    }
+    if(platformFilter){
+      const hasPlatform=
+        (platformFilter==='tiktok' && c.linkedUsernames?.tiktok)||
+        (platformFilter==='shopee' && c.linkedUsernames?.shopee)||
+        (platformFilter==='manual' && orders.some(o=>o.source==='manual'));
+      if(!hasPlatform) return false;
+    }
+    return true;
+  });
+  // sort
+  rows.sort((a,b)=>{
+    if(sort==='total_desc') return b.total-a.total;
+    if(sort==='orders_desc') return b.orders.length-a.orders.length;
+    if(sort==='recent'){const la=a.last?a.last.getTime():0, lb=b.last?b.last.getTime():0; return lb-la;}
+    if(sort==='alert'){const ia=a.insight?.daysUntilNext??999, ib=b.insight?.daysUntilNext??999; return ia-ib;}
+    return 0;
+  });
+  const cnt=document.getElementById('cust-count');if(cnt)cnt.textContent=`${rows.length} คน`;
+  if(!rows.length){
+    const emptyMsg=(S.customers||[]).length?'ไม่พบลูกค้าตามเงื่อนไข':'ยังไม่มีลูกค้า — กด "+ เพิ่มลูกค้า" หรือผูกจาก username ด้านล่าง';
+    tbody.innerHTML=`<tr><td colspan="10"><div class="empty"><div class="ei">👤</div><p>${emptyMsg}</p></div></td></tr>`;
   } else {
-    const rows=list.map(c=>{
-      const orders=getCustomerOrders(c);
-      const total=orders.reduce((s,o)=>s+(o.revenue||0),0);
-      const last=orders.map(o=>parseOrderDate(o.date)).filter(d=>d&&!isNaN(d.getTime())&&d.getTime()>0).sort((a,b)=>b-a)[0];
-      return {c,orders,total,last,insight:getCustomerInsights(c)};
-    }).sort((a,b)=>b.total-a.total);
-    tbody.innerHTML=rows.map(({c,orders,total,last,insight})=>{
+    tbody.innerHTML=rows.map(({c,orders,total,last,insight,days})=>{
       const n=orders.length;
       const plats=[...new Set(orders.map(o=>getPlatformLabel(o).label))];
       const lastStr=last?`${String(last.getDate()).padStart(2,'0')}/${String(last.getMonth()+1).padStart(2,'0')}/${last.getFullYear()}`:'-';
       const gapStr=insight?`ทุก ${Math.round(insight.avgGap)} วัน`:'<span style="color:var(--text2)">-</span>';
-      const statusStr=insight?`<span style="color:${insight.statusColor};font-weight:600;font-size:.78rem">${insight.status}</span>`:'<span style="color:var(--text2);font-size:.78rem">ข้อมูลไม่พอ</span>';
+      let statusStr;
+      if(insight){statusStr=`<span style="color:${insight.statusColor};font-weight:600;font-size:.78rem">${insight.status}</span>`;}
+      else if(days>15){statusStr=`<span style="color:var(--text2);font-weight:600;font-size:.78rem">💤 ไม่กลับมา ${days} วันแล้ว</span>`;}
+      else{statusStr='<span style="color:var(--text2);font-size:.78rem">ซื้อครั้งเดียว</span>';}
       return `<tr id="cust-row-${c.id}" style="cursor:pointer" onclick="toggleCustomerOrders('${c.id}')">
         <td><b>${esc(c.name)}</b></td><td>${esc(c.nickname||'-')}</td>
         <td style="font-size:.76rem">${plats.join(', ')||'-'}</td>
@@ -2748,6 +2878,7 @@ function renderCustomerList(){
       <tr id="cust-detail-${c.id}" style="display:none"><td colspan="10" style="background:var(--surface2);padding:0">${customerOrdersHtml(orders,c)}</td></tr>`;
     }).join('');
   }
+  renderCustomerSegments();
   renderCustomerAlerts();
   renderUnknownBuyers();
 }
@@ -2782,28 +2913,37 @@ function toggleCustomerOrders(id){const el=document.getElementById('cust-detail-
 
 function renderCustomerAlerts(){
   const box=document.getElementById('cust-alerts');if(!box)return;
-  const alerts=(S.customers||[]).map(c=>({cust:c,insight:getCustomerInsights(c)}))
-    .filter(a=>a.insight&&(a.insight.daysUntilNext<=3||a.insight.daysSinceLast>a.insight.avgGap*2))
-    .sort((a,b)=>{
-      const aGone=a.insight.daysSinceLast>a.insight.avgGap*2;
-      const bGone=b.insight.daysSinceLast>b.insight.avgGap*2;
-      if(aGone&&!bGone)return -1;
-      if(!aGone&&bGone)return 1;
-      return b.insight.daysSinceLast-a.insight.daysSinceLast;
-    });
-  if(!alerts.length){box.style.display='none';box.innerHTML='';return;}
-  box.style.display='';
-  box.innerHTML=`<div class="card" style="border-left:4px solid var(--accent)"><div class="card-title"><span>⚠️</span>แจ้งเตือนลูกค้า (${alerts.length})</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">${alerts.map(({cust,insight})=>{
-      const gone=insight.daysSinceLast>insight.avgGap*2;
-      const bg=gone?'var(--red-light)':'rgba(212,160,23,.12)';
-      return `<div style="background:${bg};border-radius:10px;padding:12px 14px">
-        <div style="font-weight:700;font-size:.9rem">${esc(cust.name)}${cust.nickname?` <span style="color:var(--text2);font-weight:400">(${esc(cust.nickname)})</span>`:''}</div>
+  const CHURN_DAYS=15;
+  const enriched=(S.customers||[]).map(c=>({c,orders:getCustomerOrders(c),insight:getCustomerInsights(c),days:getDaysSinceLast(c)}));
+  // ใกล้ถึงรอบซื้อ
+  const near=enriched.filter(e=>e.insight&&e.insight.showAlert).sort((a,b)=>a.insight.daysUntilNext-b.insight.daysUntilNext);
+  // ลูกค้าซื้อซ้ำ (>1 ครั้ง) ที่หายไป >15 วัน — กลุ่มที่ควรตามกลับ เรียงตามยอดสะสมมากสุด
+  const winback=enriched.filter(e=>e.orders.length>1&&e.days!=null&&e.days>CHURN_DAYS)
+    .map(e=>({...e,total:e.orders.reduce((s,o)=>s+(o.revenue||0),0)}))
+    .sort((a,b)=>b.total-a.total);
+  let html='';
+  if(near.length){
+    html+=`<div class="card" style="border-left:4px solid var(--yellow)"><div class="card-title"><span>⚠️</span>ใกล้ถึงรอบซื้อ (${near.length})</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">${near.map(({c,insight,orders})=>
+      `<div style="background:rgba(212,160,23,.12);border-radius:10px;padding:12px 14px">
+        <div style="font-weight:700;font-size:.9rem">${esc(c.name)}${c.nickname?` <span style="color:var(--text2);font-weight:400">(${esc(c.nickname)})</span>`:''}</div>
         <div style="font-size:.8rem;color:${insight.statusColor};font-weight:600;margin:4px 0">${insight.status}</div>
-        <div style="font-size:.76rem;color:var(--text2)">ซื้อทุก ~${Math.round(insight.avgGap)} วัน · ${insight.orders.length} ออเดอร์</div>
-        <button class="btn btn-outline btn-sm" style="margin-top:8px;padding:4px 12px" onclick="focusCustomer('${cust.id}')">ดูประวัติ</button>
-      </div>`;
-    }).join('')}</div></div>`;
+        <div style="font-size:.76rem;color:var(--text2)">ซื้อทุก ~${Math.round(insight.avgGap)} วัน · ${orders.length} ออเดอร์</div>
+        <button class="btn btn-outline btn-sm" style="margin-top:8px;padding:4px 12px" onclick="focusCustomer('${c.id}')">ดูประวัติ</button>
+      </div>`).join('')}</div></div>`;
+  }
+  if(winback.length){
+    html+=`<div class="card" style="border-left:4px solid var(--red)"><div class="card-title"><span>🔔</span>ลูกค้าซื้อซ้ำที่หายไป — ควรตามกลับ (${winback.length})</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">${winback.map(({c,orders,days,total})=>
+      `<div style="background:var(--red-light);border-radius:10px;padding:12px 14px">
+        <div style="font-weight:700;font-size:.9rem">${esc(c.name)}${c.nickname?` <span style="color:var(--text2);font-weight:400">(${esc(c.nickname)})</span>`:''}</div>
+        <div style="font-size:.8rem;color:var(--red);font-weight:600;margin:4px 0">💤 หายไป ${days} วัน</div>
+        <div style="font-size:.76rem;color:var(--text2)">${orders.length} ออเดอร์ · ยอดสะสม ฿${total.toFixed(0)}</div>
+        <button class="btn btn-outline btn-sm" style="margin-top:8px;padding:4px 12px" onclick="focusCustomer('${c.id}')">ดูประวัติ</button>
+      </div>`).join('')}</div></div>`;
+  }
+  if(!html){box.style.display='none';box.innerHTML='';return;}
+  box.style.display='';box.innerHTML=html;
 }
 function focusCustomer(id){
   let row=document.getElementById('cust-row-'+id);
