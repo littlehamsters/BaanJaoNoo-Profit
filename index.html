@@ -3133,6 +3133,36 @@ function deleteCustomerFromModal(){
 }
 
 // ---- Business overview (Tab 1) ----
+function showLiveDayDetail(d){
+  const sched=window._liveSched; const box=document.getElementById('cust-live-day-detail');
+  if(!sched||!box) return;
+  const hours=sched.hourByDay[d]||[];
+  const total=hours.reduce((s,n)=>s+n,0);
+  const dayName=sched.dayFull[d];
+  if(!total){
+    box.innerHTML=`<div style="margin-top:12px;padding:10px 14px;background:var(--surface2);border-radius:10px;font-size:.8rem;color:var(--text2)">📅 <b>วัน${dayName}</b> — ยังไม่มีข้อมูลเวลาสั่งซื้อของวันนี้<br><span style="font-size:.74rem">(re-import ไฟล์เดิมเพื่อเก็บเวลา หรือวันนี้ขายผ่านช่องทางที่ไม่บันทึกเวลา)</span></div>`;
+    return;
+  }
+  const bins=[];
+  for(let h=0;h<24;h+=2){ const c=(hours[h]||0)+(hours[h+1]||0); if(c>0) bins.push({h,c,label:`${String(h).padStart(2,'0')}:00-${String(h+2).padStart(2,'0')}:00`}); }
+  const maxC=Math.max(...bins.map(b=>b.c));
+  const top=bins.slice().sort((a,b)=>b.c-a.c)[0];
+  const rows=bins.map(b=>{
+    const isTop=b.h===top.h, w=Math.round(b.c/maxC*100);
+    return `<div style="display:flex;align-items:center;gap:8px;margin:3px 0">
+      <div style="width:104px;font-size:.76rem;${isTop?'font-weight:700;color:var(--accent)':'color:var(--text2)'}">${b.label}</div>
+      <div style="flex:1;background:var(--surface2);border-radius:5px;overflow:hidden;height:18px"><div style="width:${w}%;height:100%;background:var(--accent);opacity:${isTop?1:.45}"></div></div>
+      <div style="width:62px;text-align:right;font-size:.76rem;${isTop?'font-weight:700':''}">${b.c} ออเดอร์</div>
+    </div>`;
+  }).join('');
+  const fmtStart=`${String(((top.h-1)+24)%24).padStart(2,'0')}:15`;
+  box.innerHTML=`<div style="margin-top:12px;padding:12px 14px;background:var(--surface);border:1.5px solid var(--accent);border-radius:10px">
+    <div style="font-weight:700;font-size:.86rem;margin-bottom:8px">📅 วัน${dayName} — ช่วงเวลาที่ลูกค้าสั่งซื้อ (${total} ออเดอร์)</div>
+    ${rows}
+    <div style="margin-top:8px;font-weight:700;color:var(--accent);font-size:.84rem">💡 ควรไลฟ์ช่วง ${top.label} (${top.c} ออเดอร์) · เริ่มไลฟ์ ~${fmtStart} น.</div>
+  </div>`;
+}
+
 function renderCustomerBusiness(){
   const all=[...(S.orders||[]),...(S.manualSales||[])];
   // Card 1: day of week
@@ -3152,26 +3182,31 @@ function renderCustomerBusiness(){
   });
   const ordersByDay=[0,0,0,0,0,0,0], revenueByDay=[0,0,0,0,0,0,0];
   const ordersByHour=new Array(24).fill(0); let timedCount=0;
+  const hourByDay=Array.from({length:7},()=>new Array(24).fill(0)); // [dayOfWeek][hour]
   liveOrders.forEach(o=>{
     const dd=parseOrderDate(o.date);
-    if(dd&&!isNaN(dd.getTime())&&dd.getTime()>0){ ordersByDay[dd.getDay()]++; revenueByDay[dd.getDay()]+=(o.revenue||0); }
-    // ใช้ createdTime (เวลาที่ลูกค้าสั่งจริง) เท่านั้น — ไม่ fallback ไป shippedDate (เวลาส่งของให้ขนส่ง = คนละความหมาย ทำให้แนะนำเวลาไลฟ์เพี้ยน)
+    let dow=null;
+    if(dd&&!isNaN(dd.getTime())&&dd.getTime()>0){ dow=dd.getDay(); ordersByDay[dow]++; revenueByDay[dow]+=(o.revenue||0); }
+    // ใช้ createdTime (เวลาที่ลูกค้าสั่งจริง) เท่านั้น — ไม่ fallback ไป shippedDate (เวลาส่งของ = คนละความหมาย)
     const t=o.createdTime;
-    if(t){ const ht=new Date(String(t).replace(/\\t/g,'').trim()); if(!isNaN(ht.getTime())){ ordersByHour[ht.getHours()]++; timedCount++; } }
+    if(t){ const ht=new Date(String(t).replace(/\\t/g,'').trim()); if(!isNaN(ht.getTime())){ const h=ht.getHours(); ordersByHour[h]++; timedCount++; hourByDay[dow!=null?dow:ht.getDay()][h]++; } }
   });
-  // แนะนำวันไลฟ์: top 4 วันที่มีออเดอร์ = เขียว, bottom 2 = แดง (วันพัก)
+  // แนะนำวันไลฟ์: top 4 วันที่มีออเดอร์ = เขียว(ควรไลฟ์), bottom 2 = แดง(พัก), ที่เหลือ = เทา(ตามสะดวก)
   const dayIdx=[0,1,2,3,4,5,6];
   const greenDays=new Set([...dayIdx].sort((a,b)=>ordersByDay[b]-ordersByDay[a]).filter(d=>ordersByDay[d]>0).slice(0,4));
   const redDays=new Set([...dayIdx].sort((a,b)=>ordersByDay[a]-ordersByDay[b]).filter(d=>!greenDays.has(d)).slice(0,2));
+  const neutralDays=new Set(dayIdx.filter(d=>!greenDays.has(d)&&!redDays.has(d)));
   const dayShort={0:'อา',1:'จ',2:'อ',3:'พ',4:'พฤ',5:'ศ',6:'ส'};
   const dayFull={0:'อาทิตย์',1:'จันทร์',2:'อังคาร',3:'พุธ',4:'พฤหัส',5:'ศุกร์',6:'เสาร์'};
+  window._liveSched={hourByDay,dayFull};
   const pills=[1,2,3,4,5,6,0].map(d=>{
     const inG=greenDays.has(d), inR=redDays.has(d);
     const bg=inG?'var(--green-light)':inR?'var(--red-light)':'var(--surface2)';
     const col=inG?'var(--green)':inR?'var(--red)':'var(--text2)';
-    return `<div style="flex:1;min-width:32px;text-align:center;background:${bg};color:${col};border-radius:8px;padding:7px 2px"><div style="font-size:.78rem;font-weight:700">${dayShort[d]}</div><div style="font-size:.72rem">${ordersByDay[d]}</div></div>`;
+    return `<div onclick="showLiveDayDetail(${d})" title="กดดูช่วงเวลาขายของวัน${dayFull[d]}" style="flex:1;min-width:32px;text-align:center;background:${bg};color:${col};border-radius:8px;padding:7px 2px;cursor:pointer"><div style="font-size:.78rem;font-weight:700">${dayShort[d]}</div><div style="font-size:.72rem">${ordersByDay[d]}</div></div>`;
   }).join('');
-  // แนะนำเวลาไลฟ์: รวมตามช่วง หา period ที่ขายดีสุด
+  const legend=`<div style="font-size:.7rem;color:var(--text2);text-align:center;margin-top:6px">🟢 ควรไลฟ์ · ⚪ ตามสะดวก · 🔴 วันพัก — 👆 กดที่วันเพื่อดูช่วงเวลาขายของวันนั้น</div>`;
+  // แนะนำเวลาไลฟ์ (ภาพรวมทุกวัน): หา period ที่ขายดีสุด
   const periods=[{label:'🌙 ดึก',from:0,to:5},{label:'🌅 เช้า',from:6,to:11},{label:'☀️ บ่าย',from:12,to:16},{label:'🌆 เย็น',from:17,to:20},{label:'🌃 ค่ำ',from:21,to:23}];
   periods.forEach(p=>{ p.count=0; for(let h=p.from;h<=p.to;h++) p.count+=ordersByHour[h]; });
   const topPeriod=periods.slice().sort((a,b)=>b.count-a.count)[0];
@@ -3181,16 +3216,22 @@ function renderCustomerBusiness(){
     for(let h=topPeriod.from;h<=topPeriod.to;h++){ if(ordersByHour[h]>peakC){ peakC=ordersByHour[h]; peakHour=h; } }
     const fmt=mins=>{ const m=((mins%1440)+1440)%1440; return `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`; };
     const startT=fmt(peakHour*60-45), endT=fmt((peakHour+1)*60);
-    timeBadge=`<div style="background:var(--accent-light);border-radius:10px;padding:10px 14px;margin-top:12px;text-align:center"><div style="font-size:.78rem;color:var(--text2)">ช่วงที่ลูกค้าสั่งซื้อมากสุด: ${topPeriod.label} (${topPeriod.count} ออเดอร์)</div><div style="font-weight:700;color:var(--accent);margin-top:2px">⏰ เริ่ม ${startT} น. · ไลฟ์ถึง ${endT} น.</div></div>`;
+    timeBadge=`<div style="background:var(--accent-light);border-radius:10px;padding:10px 14px;margin-top:12px;text-align:center"><div style="font-size:.78rem;color:var(--text2)">ช่วงที่ลูกค้าสั่งซื้อมากสุด (ทุกวันรวมกัน): ${topPeriod.label} (${topPeriod.count} ออเดอร์)</div><div style="font-weight:700;color:var(--accent);margin-top:2px">⏰ เริ่ม ${startT} น. · ไลฟ์ถึง ${endT} น.</div></div>`;
   } else {
-    timeBadge=`<div style="background:var(--accent-light);border-radius:10px;padding:10px 14px;margin-top:12px;text-align:center;font-size:.78rem;color:var(--text2)">⏰ ยังแนะนำเวลาไลฟ์ไม่ได้ — ออเดอร์เก่ายังไม่มี<b>เวลาสั่งซื้อ</b> (เก็บแค่เวลาส่งของ)<br><b style="color:var(--accent)">วิธีแก้: re-import ไฟล์ TikTok/Shopee เดิม</b> เพื่อเติมเวลาสั่งซื้อ แล้วระบบจะแนะนำเวลาให้</div>`;
+    timeBadge=`<div style="background:var(--accent-light);border-radius:10px;padding:10px 14px;margin-top:12px;text-align:center;font-size:.78rem;color:var(--text2)">⏰ ยังแนะนำเวลาไลฟ์ไม่ได้ — ออเดอร์ยังไม่มี<b>เวลาสั่งซื้อ</b> (มีเฉพาะเวลาส่งของ)<br><b style="color:var(--accent)">วิธีแก้: re-import ไฟล์ TikTok/Shopee เดิม</b> เพื่อเติมเวลาสั่งซื้อ</div>`;
   }
-  const liveCount=greenDays.size;
-  const restNames=[...redDays].map(d=>dayFull[d]).join(' + ');
-  const summary=liveCount?`ไลฟ์ ${liveCount} วัน/สัปดาห์${restNames?` · พัก${restNames}`:''}`:'ยังไม่มีข้อมูลออเดอร์พอแนะนำ';
+  const weekOrder=[1,2,3,4,5,6,0];
+  const namesOf=set=>weekOrder.filter(d=>set.has(d)).map(d=>dayFull[d]).join(' ');
+  let summary;
+  if(!greenDays.size){ summary='ยังไม่มีข้อมูลออเดอร์พอแนะนำ'; }
+  else {
+    summary=`ไลฟ์ ${greenDays.size} วัน: <span style="color:var(--green)">${namesOf(greenDays)}</span>`;
+    if(neutralDays.size) summary+=` · ตามสะดวก: ${namesOf(neutralDays)}`;
+    if(redDays.size) summary+=` · พัก: <span style="color:var(--red)">${namesOf(redDays)}</span>`;
+  }
   const disclaimer=liveOrders.length<30?`<div style="font-size:.72rem;color:var(--yellow);text-align:center;margin-top:8px">⚠️ ข้อมูลยังน้อย (${liveOrders.length} ออเดอร์) ผลอาจคลาดเคลื่อน</div>`:'';
   const liveBox=document.getElementById('cust-live-schedule');
-  if(liveBox)liveBox.innerHTML=`<div style="display:flex;gap:5px">${pills}</div>${timeBadge}<div style="text-align:center;font-weight:600;margin-top:12px;font-size:.86rem">📋 ${summary}</div>${disclaimer}`;
+  if(liveBox)liveBox.innerHTML=`<div style="display:flex;gap:5px">${pills}</div>${legend}<div id="cust-live-day-detail"></div>${timeBadge}<div style="text-align:center;font-weight:600;margin-top:12px;font-size:.84rem;line-height:1.7">📋 ${summary}</div>${disclaimer}`;
   // Card 3: avg order value per platform
   const grp={tiktok:{c:0,t:0,label:'🎵 TikTok'},shopee:{c:0,t:0,label:'🛍️ Shopee'},other:{c:0,t:0,label:'🏪 อื่นๆ'}};
   all.forEach(o=>{const k=(!o.source||o.source==='tiktok')?'tiktok':o.source==='shopee'?'shopee':'other';grp[k].c++;grp[k].t+=(o.revenue||0);});
