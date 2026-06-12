@@ -138,6 +138,8 @@ tbody td{padding:10px 12px}
     </div>
   </div>
   <div id="stock-dry" style="display:none">
+    <div id="smart-stock-alert"></div>
+    <div id="production-suggestion"></div>
     <div class="card"><div class="card-title"><span>🔥</span>บันทึกการอบแห้ง (Lot ใหม่)</div>
       <div style="font-size:.82rem;font-weight:700;color:var(--text2);margin-bottom:8px">① วัตถุดิบที่ใช้อบ</div>
       <div class="form-grid" style="margin-bottom:12px;grid-template-columns:1fr">
@@ -1224,13 +1226,110 @@ function saveDryLot(){
   showNotif(`บันทึก Lot แล้ว (${vo.length} ชนิด) ✅`);
 }
 
+// ===================== SMART STOCK / PRODUCTION =====================
+function getStockVelocity(){
+  // ยอดขายเฉลี่ยต่อวัน ย้อนหลัง 30 วัน + วันที่สต็อกจะหมด
+  const now=new Date();
+  const cutoff=new Date(now-30*24*60*60*1000);
+  const salesMap={};
+  [...S.orders,...(S.manualSales||[])].forEach(o=>{
+    const d=parseOrderDate(o.date);
+    if(!d||isNaN(d.getTime())||d<cutoff) return;
+    if(!['เสร็จสมบูรณ์','จัดส่งแล้ว'].includes(o.status)) return;
+    (o.items||[]).forEach(item=>{ salesMap[item.name]=(salesMap[item.name]||0)+item.qty; });
+  });
+  const result={};
+  Object.keys(PRODUCT_ICONS).forEach(name=>{
+    const totalSold=salesMap[name]||0;
+    const avgPerDay=round2(totalSold/30);
+    const stock=S.stock[name]||0;
+    const daysLeft=avgPerDay>0?Math.floor(stock/avgPerDay):null;
+    result[name]={avgPerDay,stock,daysLeft};
+  });
+  return result;
+}
+function getProductMargin(name){
+  const relevant=[...S.orders,...(S.manualSales||[])].filter(o=>(o.items||[]).some(i=>i.name===name)&&o.revenue>0);
+  if(!relevant.length) return 0;
+  const avgMargin=relevant.reduce((s,o)=>s+(o.profit/o.revenue*100),0)/relevant.length;
+  return round2(avgMargin);
+}
+function buildProdReason(daysLeft,margin,avgPerDay){
+  const parts=[];
+  if(daysLeft!==null&&daysLeft<=3) parts.push('⚠️ ใกล้หมด');
+  else if(daysLeft!==null&&daysLeft<=7) parts.push('📉 สต็อกน้อย');
+  if(margin>=60) parts.push('💰 margin สูง');
+  if(avgPerDay>=2) parts.push('🔥 ขายดี');
+  return parts.join(' · ')||'แนะนำตามสถิติ';
+}
+function getProductionSuggestions(){
+  const vel=getStockVelocity();
+  return Object.keys(PRODUCT_ICONS).map(name=>{
+    const v=vel[name];
+    const margin=getProductMargin(name);
+    const urgencyScore=v.daysLeft!==null?Math.max(0,14-v.daysLeft):0;
+    const marginScore=margin/100*10;
+    const demandScore=v.avgPerDay*5;
+    const totalScore=round2(urgencyScore+marginScore+demandScore);
+    return {name,score:totalScore,daysLeft:v.daysLeft,avgPerDay:v.avgPerDay,margin,reason:buildProdReason(v.daysLeft,margin,v.avgPerDay)};
+  }).filter(s=>s.avgPerDay>0).sort((a,b)=>b.score-a.score).slice(0,3);
+}
+function renderSmartStockAlert(){
+  const box=document.getElementById('smart-stock-alert');if(!box)return;
+  const vel=getStockVelocity();
+  const urgent=Object.entries(vel).filter(([,v])=>v.daysLeft!==null&&v.daysLeft<=7).sort(([,a],[,b])=>a.daysLeft-b.daysLeft);
+  if(!urgent.length){
+    box.innerHTML=`<div class="card" style="border-left:4px solid var(--green)"><div class="card-title"><span>📊</span>Smart Stock Alert</div><div style="color:var(--green);font-weight:600;font-size:.86rem">✅ สต็อกทุกอย่างปกติ — ไม่มีชนิดไหนใกล้หมดใน 7 วัน</div></div>`;
+    return;
+  }
+  box.innerHTML=`<div class="card" style="border-left:4px solid var(--red)"><div class="card-title"><span>📊</span>Smart Stock Alert (${urgent.length})</div>
+    <div style="display:flex;flex-direction:column;gap:8px">${urgent.map(([name,v])=>{
+      const icon=v.daysLeft<=3?'🔴':'🟡';
+      const color=v.daysLeft<=3?'var(--red)':'var(--yellow)';
+      return `<div style="display:flex;align-items:center;gap:12px;padding:9px 14px;background:var(--surface2);border-radius:8px">
+        <div style="font-size:1.2rem">${icon}</div>
+        <div style="flex:1;font-weight:700">${PRODUCT_ICONS[name]||''} ${name}</div>
+        <div style="text-align:right;font-size:.8rem"><div style="color:${color};font-weight:700">หมดใน ~${v.daysLeft} วัน</div><div style="color:var(--text2)">เหลือ ${v.stock} ถุง · ขาย ${v.avgPerDay.toFixed(1)}/วัน</div></div>
+      </div>`;
+    }).join('')}</div></div>`;
+}
+function renderProductionSuggestion(){
+  const box=document.getElementById('production-suggestion');if(!box)return;
+  const sugg=getProductionSuggestions();
+  if(!sugg.length){box.style.display='none';box.innerHTML='';return;}
+  box.style.display='';
+  const medals=['🥇','🥈','🥉'];
+  box.innerHTML=`<div class="card"><div class="card-title"><span>🔥</span>แนะนำอบรอบหน้า</div>
+    <div style="display:flex;flex-direction:column;gap:10px">${sugg.map((s,i)=>{
+      const dc=s.daysLeft!==null&&s.daysLeft<=3?'var(--red)':s.daysLeft!==null&&s.daysLeft<=7?'var(--yellow)':'var(--text2)';
+      return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--surface2);border-radius:8px">
+        <div style="font-size:1.3rem">${medals[i]||'•'}</div>
+        <div style="flex:1"><div style="font-weight:700">${PRODUCT_ICONS[s.name]||''} ${s.name}</div><div style="font-size:.78rem;color:var(--text2)">${s.reason}</div></div>
+        <div style="text-align:right;font-size:.8rem"><div style="color:${dc}">${s.daysLeft!==null?`หมดใน ${s.daysLeft} วัน`:'-'}</div><div style="color:var(--text2)">margin ${s.margin.toFixed(0)}%</div></div>
+      </div>`;
+    }).join('')}</div>
+    <div style="font-size:.75rem;color:var(--text2);margin-top:10px">* คำนวณจากยอดขาย 30 วันล่าสุด + margin เฉลี่ย</div></div>`;
+}
+
 function renderDryStock(){
   const g=document.getElementById('dry-stock-grid');if(!g)return;
+  const vel=getStockVelocity();
   g.innerHTML=Object.keys(PRODUCT_ICONS).map(name=>{
     const qty=S.stock[name]||0,cpb=getFifoCost(name),pct=Math.min((qty/30)*100,100);
     const cls=qty===0?'stock-low':qty<=5?'stock-med':'';
-    return `<div class="prod-card ${cls}"><div class="pc-icon">${PRODUCT_ICONS[name]}</div><div class="pc-name">${name}</div><div class="pc-stock">${qty} ถุงเหลือ</div><div class="pc-cost">฿${cpb.toFixed(2)}/ถุง (FIFO)</div><div class="stock-bar ${cls}"><div class="stock-fill" style="width:${pct}%"></div></div></div>`;
+    const v=vel[name];
+    let daysHtml;
+    if(v.daysLeft!==null){
+      const color=v.daysLeft<=3?'var(--red)':v.daysLeft<=7?'var(--yellow)':'var(--green)';
+      const icon=v.daysLeft<=3?'🔴':v.daysLeft<=7?'🟡':'🟢';
+      daysHtml=`<div style="font-size:.72rem;color:${color};margin-top:3px">${icon} หมดใน ~${v.daysLeft} วัน <span style="color:var(--text2)">(${v.avgPerDay.toFixed(1)}/วัน)</span></div>`;
+    } else {
+      daysHtml=`<div style="font-size:.72rem;color:var(--text2);margin-top:3px">📊 ยังไม่มีข้อมูลขาย</div>`;
+    }
+    return `<div class="prod-card ${cls}"><div class="pc-icon">${PRODUCT_ICONS[name]}</div><div class="pc-name">${name}</div><div class="pc-stock">${qty} ถุงเหลือ</div><div class="pc-cost">฿${cpb.toFixed(2)}/ถุง (FIFO)</div>${daysHtml}<div class="stock-bar ${cls}"><div class="stock-fill" style="width:${pct}%"></div></div></div>`;
   }).join('');
+  renderSmartStockAlert();
+  renderProductionSuggestion();
 }
 
 function renderDryLots(){
@@ -1949,7 +2048,8 @@ function renderOverview(){
     <div class="stat-card"><div class="s-label">มูลค่าสต็อก</div><div class="s-val s-accent">฿${sv.toFixed(0)}</div><div class="s-sub">${Object.values(S.stock).reduce((s,v)=>s+v,0)} ถุง</div></div>
     <div class="stat-card"><div class="s-label">ของสูญเสีย 🐹</div><div class="s-val s-red">฿${totalLoss.toFixed(0)}</div><div class="s-sub">ถุง ฿${dryLoss.toFixed(0)} (${dryAdjF.length}) | กล่อง ฿${boxLoss.toFixed(0)} (${boxAdjF.length})</div></div>
     ${returnCount>0?`<div class="stat-card"><div class="s-label">↩ คืนออเดอร์</div><div class="s-val s-red">฿${returnLoss.toFixed(0)}</div><div class="s-sub">${returnCount} ออเดอร์</div></div>`:''}
-    <div class="stat-card"><div class="s-label">ค่าขนส่งรวม 🚗</div><div class="s-val s-red">฿${totalTransport.toFixed(0)}</div><div class="s-sub">ส่งออเดอร์ ฿${totalDeliveryTT.toFixed(0)} | ซื้อผัก ฿${totalTravelFresh.toFixed(0)}</div></div>`;
+    <div class="stat-card"><div class="s-label">ค่าขนส่งรวม 🚗</div><div class="s-val s-red">฿${totalTransport.toFixed(0)}</div><div class="s-sub">ส่งออเดอร์ ฿${totalDeliveryTT.toFixed(0)} | ซื้อผัก ฿${totalTravelFresh.toFixed(0)}</div></div>
+    ${(()=>{const vel=getStockVelocity();const soonest=Object.entries(vel).filter(([,v])=>v.daysLeft!==null&&v.daysLeft<=7).sort(([,a],[,b])=>a.daysLeft-b.daysLeft)[0];return `<div class="stat-card"><div class="s-label">⚠️ สต็อกวิกฤต</div><div class="s-val ${soonest?'s-red':'s-green'}">${soonest?soonest[1].daysLeft+' วัน':'-'}</div><div class="s-sub">${soonest?PRODUCT_ICONS[soonest[0]]+' '+soonest[0]+' ใกล้หมดก่อน':'ปกติทุกชนิด ✅'}</div></div>`;})()}`;
   const pd={};
   orders.forEach(o=>o.items.forEach(item=>{
     if(!pd[item.name])pd[item.name]={qty:0,rev:0,cost:0,profit:0};
