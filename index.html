@@ -1528,12 +1528,13 @@ function tryPreview(){
       const needStatusUpdate=o.status&&o.status!==ex.status;
       const needRevenueUpdate=ex.revenue===0&&rev>0;
       const needDeliveredUpdate=!ex.deliveredDate&&o.deliveredDate;
-      if(needFeeUpdate||needStatusUpdate||needRevenueUpdate||needDeliveredUpdate){
+      const needUsernameUpdate=!ex.buyerUsername&&o.buyerUsername;
+      if(needFeeUpdate||needStatusUpdate||needRevenueUpdate||needDeliveredUpdate||needUsernameUpdate){
         const newFee=needFeeUpdate?fee:ex.tiktokFee;
         const newRev=needRevenueUpdate||needFeeUpdate?(rev||ex.revenue):ex.revenue;
-        const nc=round2(ex.productCost+ex.packCost+newFee);
+        const nc=round2(ex.productCost+ex.packCost+newFee+(ex.deliveryCost||0));
         const np=round2(newRev-nc);
-        pendingUpdates.push({id:o.id,tiktokFee:newFee,revenue:newRev,totalCost:nc,profit:np,status:o.status,deliveredDate:o.deliveredDate||ex.deliveredDate||null});
+        pendingUpdates.push({id:o.id,tiktokFee:newFee,revenue:newRev,totalCost:nc,profit:np,status:o.status,deliveredDate:o.deliveredDate||ex.deliveredDate||null,buyerUsername:o.buyerUsername||ex.buyerUsername||''});
         updateCount++;
       } else {dupCount++;}
       return;
@@ -1542,7 +1543,7 @@ function tryPreview(){
     const pc=round2(o.items.reduce((s,i)=>s+i.costPerBag*i.qty,0)),pk=getPackCostFifo(tq,hc,o.date),tc=round2(pc+pk+fee),pr=round2(rev-tc);
     pendingOrders.push({id:o.id,date:o.date,shippedDate:o.shippedDate||null,deliveredDate:o.deliveredDate||null,status:o.status,buyerUsername:o.buyerUsername||'',createdTime:o.createdTime||'',items:o.items,totalQty:tq,hasCorn6:hc,revenue:rev,productCost:pc,packCost:pk,tiktokFee:fee,deliveryCost:0,totalCost:tc,profit:pr});newCount++;
   });
-  if(!pendingCSV){Object.keys(incMap).forEach(id=>{const ex=exMap[id];if(ex&&ex.tiktokFee===0){const inc=incMap[id],fee=round2(Math.abs(parseNum(inc['ค่าธรรมเนียมทั้งหมด']))),rev=round2(parseNum(inc['รายได้รวม']));if(fee>0){const nc=round2(ex.productCost+ex.packCost+fee),np=round2((rev||ex.revenue)-nc);pendingUpdates.push({id,tiktokFee:fee,revenue:rev||ex.revenue,totalCost:nc,profit:np});updateCount++;}}});}
+  if(!pendingCSV){Object.keys(incMap).forEach(id=>{const ex=exMap[id];if(ex&&ex.tiktokFee===0){const inc=incMap[id],fee=round2(Math.abs(parseNum(inc['ค่าธรรมเนียมทั้งหมด']))),rev=round2(parseNum(inc['รายได้รวม']));if(fee>0){const nc=round2(ex.productCost+ex.packCost+fee+(ex.deliveryCost||0)),np=round2((rev||ex.revenue)-nc);pendingUpdates.push({id,tiktokFee:fee,revenue:rev||ex.revenue,totalCost:nc,profit:np});updateCount++;}}});}
   const xlsxCount=pendingXLSX?pendingXLSX.length:0;
   const returnLossEst=round2(pendingReturns.reduce((s,r)=>s+(r.existingOrder.productCost||0)+(getFifoBoxCost((r.existingOrder.hasCorn6||r.existingOrder.totalQty>=5)?'B':(r.existingOrder.totalQty>=3)?'AB':null)||0),0));
   document.getElementById('preview-stats').innerHTML=`
@@ -1599,7 +1600,7 @@ function confirmImport(){
       else if(useAB) deductBoxFifo('AB',1);
     }
   });
-  (pendingUpdates||[]).forEach(u=>{const o=S.orders.find(x=>x.id===u.id);if(o){o.tiktokFee=u.tiktokFee;o.revenue=u.revenue;o.totalCost=u.totalCost;o.profit=u.profit;if(u.status)o.status=u.status;if(u.deliveredDate)o.deliveredDate=u.deliveredDate;}});
+  (pendingUpdates||[]).forEach(u=>{const o=S.orders.find(x=>x.id===u.id);if(o){o.tiktokFee=u.tiktokFee;o.revenue=u.revenue;o.totalCost=u.totalCost;o.profit=u.profit;if(u.status)o.status=u.status;if(u.deliveredDate)o.deliveredDate=u.deliveredDate;if(u.buyerUsername)o.buyerUsername=u.buyerUsername;}});
   // จัดการออเดอร์คืน/ยกเลิก
   const today=new Date().toISOString().slice(0,10);
   if(!S.orderReturns)S.orderReturns=[];
@@ -1727,9 +1728,11 @@ function tryShopeePreview(){
       'จัดส่งแล้ว'; // การจัดส่ง
     const existing=existingShopeeById[o.id];
     if(existing){
-      // ออเดอร์เดิม — อัปเดตสถานะถ้า Shopee เปลี่ยนไป (เช่น จัดส่งแล้ว → เสร็จสมบูรณ์)
-      if(existing.status!==mappedStatus){
-        pendingShopeeStatusUpdates.push({id:o.id,date:existing.date,from:existing.status,to:mappedStatus,revenue:existing.revenue,profit:existing.profit});
+      // ออเดอร์เดิม — อัปเดตสถานะถ้า Shopee เปลี่ยนไป (เช่น จัดส่งแล้ว → เสร็จสมบูรณ์) หรือเติม buyerUsername ที่ยังว่าง
+      const needStatus=existing.status!==mappedStatus;
+      const needUsername=!existing.buyerUsername&&o.buyerUsername;
+      if(needStatus||needUsername){
+        pendingShopeeStatusUpdates.push({id:o.id,date:existing.date,from:existing.status,to:mappedStatus,statusChanged:needStatus,buyerUsername:o.buyerUsername||existing.buyerUsername||'',revenue:existing.revenue,profit:existing.profit});
         updateCount++;
       } else {
         dupCount++;
@@ -1767,7 +1770,7 @@ function tryShopeePreview(){
 
   document.getElementById('shopee-preview-tbody').innerHTML=[
     ...pendingShopeeStatusUpdates.map(u=>
-    `<tr style="background:rgba(45,111,164,.06)"><td style="font-family:monospace;font-size:.75rem">${u.id.slice(-8)}</td><td>${u.date||''}</td><td style="font-size:.75rem;color:var(--text2)">-</td><td style="max-width:180px;white-space:normal;font-size:.78rem"><span class="badge ${statusBadge(u.from)}">${u.from}</span> → <span class="badge ${statusBadge(u.to)}">${u.to}</span></td><td class="text-right">-</td><td class="text-right">฿${(u.revenue||0).toFixed(2)}</td><td class="text-right">-</td><td class="text-right ${(u.profit||0)>=0?'profit-pos':'profit-neg'}">฿${(u.profit||0).toFixed(2)}</td><td style="text-align:center">🔄</td></tr>`),
+    `<tr style="background:rgba(45,111,164,.06)"><td style="font-family:monospace;font-size:.75rem">${u.id.slice(-8)}</td><td>${u.date||''}</td><td style="font-size:.75rem;color:var(--text2)">-</td><td style="max-width:180px;white-space:normal;font-size:.78rem">${u.statusChanged?`<span class="badge ${statusBadge(u.from)}">${u.from}</span> → <span class="badge ${statusBadge(u.to)}">${u.to}</span>`:'👤 อัพเดทชื่อผู้ซื้อ'}</td><td class="text-right">-</td><td class="text-right">฿${(u.revenue||0).toFixed(2)}</td><td class="text-right">-</td><td class="text-right ${(u.profit||0)>=0?'profit-pos':'profit-neg'}">฿${(u.profit||0).toFixed(2)}</td><td style="text-align:center">🔄</td></tr>`),
     ...pendingShopeeOrders.map(o=>
     `<tr><td style="font-family:monospace;font-size:.75rem">${o.id.slice(-8)}</td><td>${o.date}</td><td style="font-size:.75rem;color:var(--text2)">${o.shippedDate||'-'}</td><td style="max-width:180px;white-space:normal;font-size:.78rem">${o.items.map(i=>`${PRODUCT_ICONS[i.name]||''}${i.name}×${i.qty}`).join(', ')}</td><td class="text-right">${o.totalQty}</td><td class="text-right">฿${o.revenue.toFixed(2)}</td><td class="text-right">฿${o.tiktokFee.toFixed(2)}</td><td class="text-right ${o.profit>=0?'profit-pos':'profit-neg'}">฿${o.profit.toFixed(2)}</td><td style="text-align:center">${o.stockCutoff?'✅':'⏭️'}</td></tr>`)
   ].join('');
@@ -1780,10 +1783,10 @@ function confirmShopeeImport(){
   const updated=pendingShopeeStatusUpdates?.length||0;
   if(!S.manualSales) S.manualSales=[];
 
-  // อัปเดตสถานะออเดอร์เดิมที่ Shopee เปลี่ยนไป
+  // อัปเดตสถานะ + buyerUsername ออเดอร์เดิมที่ Shopee เปลี่ยนไป
   (pendingShopeeStatusUpdates||[]).forEach(u=>{
     const o=S.manualSales.find(x=>x.source==='shopee'&&x.id===u.id);
-    if(o) o.status=u.to;
+    if(o){o.status=u.to; if(u.buyerUsername)o.buyerUsername=u.buyerUsername;}
   });
 
   (pendingShopeeOrders||[]).forEach(o=>{
