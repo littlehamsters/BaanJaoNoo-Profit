@@ -3153,7 +3153,8 @@ function renderCustomerBusiness(){
   liveOrders.forEach(o=>{
     const dd=parseOrderDate(o.date);
     if(dd&&!isNaN(dd.getTime())&&dd.getTime()>0){ ordersByDay[dd.getDay()]++; revenueByDay[dd.getDay()]+=(o.revenue||0); }
-    const t=o.createdTime||o.shippedDate;
+    // ใช้ createdTime (เวลาที่ลูกค้าสั่งจริง) เท่านั้น — ไม่ fallback ไป shippedDate (เวลาส่งของให้ขนส่ง = คนละความหมาย ทำให้แนะนำเวลาไลฟ์เพี้ยน)
+    const t=o.createdTime;
     if(t){ const ht=new Date(String(t).replace(/\\t/g,'').trim()); if(!isNaN(ht.getTime())){ ordersByHour[ht.getHours()]++; timedCount++; } }
   });
   // แนะนำวันไลฟ์: top 4 วันที่มีออเดอร์ = เขียว, bottom 2 = แดง (วันพัก)
@@ -3178,9 +3179,9 @@ function renderCustomerBusiness(){
     for(let h=topPeriod.from;h<=topPeriod.to;h++){ if(ordersByHour[h]>peakC){ peakC=ordersByHour[h]; peakHour=h; } }
     const fmt=mins=>{ const m=((mins%1440)+1440)%1440; return `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`; };
     const startT=fmt(peakHour*60-45), endT=fmt((peakHour+1)*60);
-    timeBadge=`<div style="background:var(--accent-light);border-radius:10px;padding:10px 14px;margin-top:12px;text-align:center"><div style="font-size:.78rem;color:var(--text2)">ช่วงขายดี: ${topPeriod.label} (${topPeriod.count} ออเดอร์)</div><div style="font-weight:700;color:var(--accent);margin-top:2px">⏰ เริ่ม ${startT} น. · ไลฟ์ถึง ${endT} น.</div></div>`;
+    timeBadge=`<div style="background:var(--accent-light);border-radius:10px;padding:10px 14px;margin-top:12px;text-align:center"><div style="font-size:.78rem;color:var(--text2)">ช่วงที่ลูกค้าสั่งซื้อมากสุด: ${topPeriod.label} (${topPeriod.count} ออเดอร์)</div><div style="font-weight:700;color:var(--accent);margin-top:2px">⏰ เริ่ม ${startT} น. · ไลฟ์ถึง ${endT} น.</div></div>`;
   } else {
-    timeBadge=`<div style="font-size:.76rem;color:var(--text2);text-align:center;margin-top:12px">ยังไม่มีข้อมูลเวลาสั่งซื้อ (re-import ไฟล์เพื่อเก็บเวลา)</div>`;
+    timeBadge=`<div style="background:var(--accent-light);border-radius:10px;padding:10px 14px;margin-top:12px;text-align:center;font-size:.78rem;color:var(--text2)">⏰ ยังแนะนำเวลาไลฟ์ไม่ได้ — ออเดอร์เก่ายังไม่มี<b>เวลาสั่งซื้อ</b> (เก็บแค่เวลาส่งของ)<br><b style="color:var(--accent)">วิธีแก้: re-import ไฟล์ TikTok/Shopee เดิม</b> เพื่อเติมเวลาสั่งซื้อ แล้วระบบจะแนะนำเวลาให้</div>`;
   }
   const liveCount=greenDays.size;
   const restNames=[...redDays].map(d=>dayFull[d]).join(' + ');
