@@ -1652,12 +1652,13 @@ function tryPreview(){
       const needRevenueUpdate=ex.revenue===0&&rev>0;
       const needDeliveredUpdate=!ex.deliveredDate&&o.deliveredDate;
       const needUsernameUpdate=!ex.buyerUsername&&o.buyerUsername;
-      if(needFeeUpdate||needStatusUpdate||needRevenueUpdate||needDeliveredUpdate||needUsernameUpdate){
+      const needCreatedTimeUpdate=!ex.createdTime&&o.createdTime;
+      if(needFeeUpdate||needStatusUpdate||needRevenueUpdate||needDeliveredUpdate||needUsernameUpdate||needCreatedTimeUpdate){
         const newFee=needFeeUpdate?fee:ex.tiktokFee;
         const newRev=needRevenueUpdate||needFeeUpdate?(rev||ex.revenue):ex.revenue;
         const nc=round2(ex.productCost+ex.packCost+newFee+(ex.deliveryCost||0));
         const np=round2(newRev-nc);
-        pendingUpdates.push({id:o.id,tiktokFee:newFee,revenue:newRev,totalCost:nc,profit:np,status:o.status,deliveredDate:o.deliveredDate||ex.deliveredDate||null,buyerUsername:o.buyerUsername||ex.buyerUsername||''});
+        pendingUpdates.push({id:o.id,tiktokFee:newFee,revenue:newRev,totalCost:nc,profit:np,status:o.status,deliveredDate:o.deliveredDate||ex.deliveredDate||null,buyerUsername:o.buyerUsername||ex.buyerUsername||'',createdTime:o.createdTime||ex.createdTime||''});
         updateCount++;
       } else {dupCount++;}
       return;
@@ -1723,7 +1724,7 @@ function confirmImport(){
       else if(useAB) deductBoxFifo('AB',1);
     }
   });
-  (pendingUpdates||[]).forEach(u=>{const o=S.orders.find(x=>x.id===u.id);if(o){o.tiktokFee=u.tiktokFee;o.revenue=u.revenue;o.totalCost=u.totalCost;o.profit=u.profit;if(u.status)o.status=u.status;if(u.deliveredDate)o.deliveredDate=u.deliveredDate;if(u.buyerUsername)o.buyerUsername=u.buyerUsername;}});
+  (pendingUpdates||[]).forEach(u=>{const o=S.orders.find(x=>x.id===u.id);if(o){o.tiktokFee=u.tiktokFee;o.revenue=u.revenue;o.totalCost=u.totalCost;o.profit=u.profit;if(u.status)o.status=u.status;if(u.deliveredDate)o.deliveredDate=u.deliveredDate;if(u.buyerUsername)o.buyerUsername=u.buyerUsername;if(u.createdTime)o.createdTime=u.createdTime;}});
   // จัดการออเดอร์คืน/ยกเลิก
   const today=new Date().toISOString().slice(0,10);
   if(!S.orderReturns)S.orderReturns=[];
@@ -1859,8 +1860,9 @@ function tryShopeePreview(){
       // ออเดอร์เดิม — อัปเดตสถานะถ้า Shopee เปลี่ยนไป (เช่น จัดส่งแล้ว → เสร็จสมบูรณ์) หรือเติม buyerUsername ที่ยังว่าง
       const needStatus=existing.status!==mappedStatus;
       const needUsername=!existing.buyerUsername&&o.buyerUsername;
-      if(needStatus||needUsername){
-        pendingShopeeStatusUpdates.push({id:o.id,date:existing.date,from:existing.status,to:mappedStatus,statusChanged:needStatus,buyerUsername:o.buyerUsername||existing.buyerUsername||'',revenue:existing.revenue,profit:existing.profit});
+      const needCreatedTime=!existing.createdTime&&o.createdTime;
+      if(needStatus||needUsername||needCreatedTime){
+        pendingShopeeStatusUpdates.push({id:o.id,date:existing.date,from:existing.status,to:mappedStatus,statusChanged:needStatus,buyerUsername:o.buyerUsername||existing.buyerUsername||'',createdTime:o.createdTime||existing.createdTime||'',revenue:existing.revenue,profit:existing.profit});
         updateCount++;
       } else {
         dupCount++;
@@ -1914,7 +1916,7 @@ function confirmShopeeImport(){
   // อัปเดตสถานะ + buyerUsername ออเดอร์เดิมที่ Shopee เปลี่ยนไป
   (pendingShopeeStatusUpdates||[]).forEach(u=>{
     const o=S.manualSales.find(x=>x.source==='shopee'&&x.id===u.id);
-    if(o){o.status=u.to; if(u.buyerUsername)o.buyerUsername=u.buyerUsername;}
+    if(o){o.status=u.to; if(u.buyerUsername)o.buyerUsername=u.buyerUsername; if(u.createdTime)o.createdTime=u.createdTime;}
   });
 
   (pendingShopeeOrders||[]).forEach(o=>{
