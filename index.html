@@ -16,6 +16,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root{--bg:#f7f5f0;--surface:#fff;--surface2:#f0ede6;--border:#e2ddd4;--text:#2c2416;--text2:#7a6e5f;--accent:#c8873a;--accent-light:#f5dfc0;--green:#3a7c5c;--green-light:#c8eada;--red:#c0392b;--red-light:#fde8e6;--blue:#2d6fa4;--blue-light:#d6eaf8;--yellow:#d4a017;--shadow:0 2px 12px rgba(44,36,22,.08);--radius:12px}
@@ -87,11 +88,26 @@ tbody td{padding:10px 12px}
 </style>
 </head>
 <body>
+<div id="login-overlay" style="position:fixed;inset:0;background:linear-gradient(135deg,#f7f5f0,#e8e2d5);display:flex;align-items:center;justify-content:center;z-index:99999;font-family:'Noto Sans Thai',sans-serif">
+  <div style="background:#fff;border-radius:18px;padding:40px 34px;box-shadow:0 10px 44px rgba(0,0,0,.18);text-align:center;max-width:360px;width:90%">
+    <div style="font-size:3rem;line-height:1">🐹</div>
+    <div style="font-size:1.3rem;font-weight:700;color:#2c2416;margin-top:10px">บ้านเจ้าหนู</div>
+    <div style="font-size:.85rem;color:#7a6e5f;margin-top:4px;margin-bottom:26px">ระบบวิเคราะห์กำไร</div>
+    <button id="login-btn" onclick="loginWithGoogle()" style="display:inline-flex;align-items:center;justify-content:center;gap:10px;width:100%;background:#fff;border:1.5px solid #dcd7cd;border-radius:10px;padding:12px 16px;cursor:pointer;font-family:'Noto Sans Thai',sans-serif;font-size:.92rem;font-weight:600;color:#2c2416;transition:all .15s" onmouseover="this.style.borderColor='#c8873a'" onmouseout="this.style.borderColor='#dcd7cd'">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      เข้าสู่ระบบด้วย Google
+    </button>
+    <div id="login-error" style="color:#c0392b;font-size:.82rem;margin-top:14px;display:none"></div>
+    <div style="font-size:.72rem;color:#a09070;margin-top:22px">🔒 เฉพาะผู้ที่ได้รับอนุญาตเท่านั้น</div>
+  </div>
+</div>
 <div class="header"><div class="header-logo">🐹</div><div class="header-title">บ้านเจ้าหนู — ระบบวิเคราะห์กำไร</div>
 <div id="sync-status" style="font-size:.75rem;color:#a09070;font-family:'IBM Plex Mono',monospace;margin-left:12px">🔄 Connecting...</div>
 <div class="header-sub">TikTok Shop</div>
 <div id="build-info" style="font-size:.7rem;color:#a09070;font-family:'IBM Plex Mono',monospace;margin-left:8px">...</div>
 <button onclick="toggleDarkMode()" id="dark-btn" style="margin-left:auto;background:none;border:1px solid rgba(255,255,255,.3);color:#f7f5f0;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:.85rem;font-family:'Noto Sans Thai',sans-serif">🌙 Dark</button>
+<span id="user-label" style="font-size:.72rem;color:#f7f5f0;opacity:.85;margin-left:10px;font-family:'IBM Plex Mono',monospace"></span>
+<button onclick="logout()" id="logout-btn" style="display:none;margin-left:8px;background:none;border:1px solid rgba(255,255,255,.3);color:#f7f5f0;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:.85rem;font-family:'Noto Sans Thai',sans-serif">ออกจากระบบ</button>
 </div>
 <nav class="nav">
   <button class="nav-btn active" onclick="showPage('p-stock')">🌿 สต็อกผักผลไม้</button>
@@ -3404,6 +3420,46 @@ window.addEventListener('load',function(){
       .catch(err=>console.log('SW error:',err));
   }
   initTheme();
+  loadBuildInfo();
+  // ต้องเข้าสู่ระบบด้วย Google ก่อน — เริ่มแอปหลังยืนยันสิทธิ์
+  firebase.auth().onAuthStateChanged(handleAuthChange);
+});
+
+// ===================== AUTH (Google login) =====================
+// ⚠️ allowlist ฝั่ง client เป็นแค่ UX gate — การป้องกันจริงอยู่ที่ Firestore Security Rules (ดู README/คำอธิบาย)
+const ALLOWED_EMAILS=['tanawat.lukkanapinij@gmail.com','littlehamsterhome@gmail.com','mantana1995sp@gmail.com'];
+let appInited=false;
+
+function handleAuthChange(user){
+  if(!user){ showLogin(); return; }
+  const email=(user.email||'').toLowerCase();
+  if(!ALLOWED_EMAILS.includes(email)){
+    showLogin(`บัญชี ${user.email} ไม่มีสิทธิ์เข้าใช้งาน`);
+    firebase.auth().signOut();
+    return;
+  }
+  hideLogin();
+  const lb=document.getElementById('logout-btn'); if(lb)lb.style.display='';
+  const ul=document.getElementById('user-label'); if(ul)ul.textContent='👤 '+user.email;
+  if(!appInited){ appInited=true; initApp(); }
+}
+function showLogin(err){
+  const ov=document.getElementById('login-overlay'); if(ov)ov.style.display='flex';
+  const e=document.getElementById('login-error');
+  if(e){ if(err){e.textContent='⚠️ '+err;e.style.display='';} else {e.style.display='none';} }
+  const lb=document.getElementById('logout-btn'); if(lb)lb.style.display='none';
+  const ul=document.getElementById('user-label'); if(ul)ul.textContent='';
+}
+function hideLogin(){ const ov=document.getElementById('login-overlay'); if(ov)ov.style.display='none'; }
+function loginWithGoogle(){
+  const btn=document.getElementById('login-btn'); if(btn){btn.disabled=true;btn.style.opacity='.6';}
+  firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider())
+    .catch(err=>{ showLogin('เข้าสู่ระบบไม่สำเร็จ: '+(err.message||err.code||'')); })
+    .finally(()=>{ if(btn){btn.disabled=false;btn.style.opacity='1';} });
+}
+function logout(){ firebase.auth().signOut().then(()=>location.reload()); }
+
+function initApp(){
   loadState();
   startFirebaseSync();
   document.getElementById('f-date').value=new Date().toISOString().slice(0,10);
@@ -3419,8 +3475,7 @@ window.addEventListener('load',function(){
   renderOverview();
   // แจ้งเตือนสต็อกต่ำ
   setTimeout(checkLowStock, 800);
-  loadBuildInfo();
-});
+}
 
 function loadBuildInfo(){
   fetch('https://api.github.com/repos/littlehamsters/BaanJaoNoo-Profit/commits/main')
