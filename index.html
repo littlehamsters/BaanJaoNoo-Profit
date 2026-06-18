@@ -43,8 +43,8 @@ body{font-family:"Noto Sans Thai",sans-serif;background:var(--bg);color:var(--te
 .form-group input,.form-group select{border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-family:"Noto Sans Thai",sans-serif;font-size:.88rem;background:var(--bg);color:var(--text);transition:border-color .15s}
 .form-group input:focus,.form-group select:focus{outline:none;border-color:var(--accent);background:#fff}
 .btn{padding:9px 18px;border:none;border-radius:8px;font-family:"Noto Sans Thai",sans-serif;font-size:.88rem;font-weight:600;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
-.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#b07530;transform:translateY(-1px)}
-.btn-green{background:var(--green);color:#fff}.btn-green:hover{background:#2d6347}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#658041;transform:translateY(-1px)}
+.btn-green{background:var(--green);color:#fff}.btn-green:hover{background:#3E7341}
 .btn-outline{background:transparent;border:1.5px solid var(--border);color:var(--text)}.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
 .btn-danger{background:transparent;border:1.5px solid var(--red);color:var(--red);padding:5px 10px;font-size:.78rem}.btn-danger:hover{background:var(--red-light)}
 .btn-sm{padding:6px 12px;font-size:.8rem}
@@ -1844,19 +1844,23 @@ function tryShopeePreview(){
       status.includes('ผู้ซื้อได้รับสินค้าแล้ว');
     if(!oid||!isAccepted) return;
     if(!orderMap[oid]){
+      // fee fields ซ้ำทุก row → เก็บจาก row แรกของ order เท่านั้น
       orderMap[oid]={
         id:oid,
         date:formatShopeeDate(r['วันที่ทำการสั่งซื้อ']||''),
         shippedDate:String(r['เวลาส่งสินค้า']||'').trim(),
-        revenue:round2(parseFloat(r['ราคาสินค้าที่ชำระโดยผู้ซื้อ (THB)']||0)),
+        revenue:0, // SUM ของ col "ราคาขายสุทธิ" ทุก row ด้านล่าง
         commission:round2(Math.abs(parseFloat(r['ค่าคอมมิชชั่น']||0))),
         transFee:round2(Math.abs(parseFloat(r['Transaction Fee']||0))),
+        serviceFee:round2(Math.abs(parseFloat(r['ค่าบริการ']||0))),
         buyerUsername:String(r['Buyer Username']||r['ชื่อผู้ใช้ (ผู้ซื้อ)']||r['ชื่อผู้ใช้ของผู้ซื้อ']||'').trim(),
         createdTime:String(r['วันที่ทำการสั่งซื้อ']||'').trim(),
         rawStatus:status,
         items:[]
       };
     }
+    // Revenue = SUM ราคาขายสุทธิ ทุก row (ไม่ใช่ราคาที่ลูกค้าจ่าย ซึ่งอาจถูกลดด้วยโค้ด Shopee)
+    orderMap[oid].revenue += parseFloat(r['ราคาขายสุทธิ']||0);
     const name=shopeeMapName(r['ชื่อตัวเลือก'],r['ชื่อสินค้า']);
     const qty=parseInt(r['จำนวน'])||1;
     orderMap[oid].items.push({name,qty,costPerBag:getFifoCost(name)});
@@ -1873,12 +1877,18 @@ function tryShopeePreview(){
       'จัดส่งแล้ว'; // การจัดส่ง
     const existing=existingShopeeById[o.id];
     if(existing){
-      // ออเดอร์เดิม — อัปเดตสถานะถ้า Shopee เปลี่ยนไป (เช่น จัดส่งแล้ว → เสร็จสมบูรณ์) หรือเติม buyerUsername ที่ยังว่าง
+      // ออเดอร์เดิม — อัปเดตสถานะ/username/createdTime หรือ revenue+fee ที่คำนวณใหม่ (สูตรถูกต้อง)
       const needStatus=existing.status!==mappedStatus;
       const needUsername=!existing.buyerUsername&&o.buyerUsername;
       const needCreatedTime=!existing.createdTime&&o.createdTime;
-      if(needStatus||needUsername||needCreatedTime){
-        pendingShopeeStatusUpdates.push({id:o.id,date:existing.date,from:existing.status,to:mappedStatus,statusChanged:needStatus,buyerUsername:o.buyerUsername||existing.buyerUsername||'',createdTime:o.createdTime||existing.createdTime||'',revenue:existing.revenue,profit:existing.profit});
+      const newRevenue=round2(o.revenue);
+      const newFee=round2(o.commission+o.transFee+(o.serviceFee||0));
+      const needFinance=Math.abs((existing.revenue||0)-newRevenue)>0.01||Math.abs((existing.tiktokFee||0)-newFee)>0.01;
+      // recompute totalCost/profit โดยคง deliveryCost เดิมไว้ (recalcDeliveryCosts จะ freeze ออเดอร์ที่มีค่าส่งแล้ว)
+      const newTotalCost=round2((existing.productCost||0)+(existing.packCost||0)+newFee+(existing.deliveryCost||0)+(existing.shippingCost||0));
+      const newProfit=round2(newRevenue-newTotalCost);
+      if(needStatus||needUsername||needCreatedTime||needFinance){
+        pendingShopeeStatusUpdates.push({id:o.id,date:existing.date,from:existing.status,to:mappedStatus,statusChanged:needStatus,financeChanged:needFinance,buyerUsername:o.buyerUsername||existing.buyerUsername||'',createdTime:o.createdTime||existing.createdTime||'',newRevenue,newFee,newTotalCost,revenue:needFinance?newRevenue:existing.revenue,profit:needFinance?newProfit:existing.profit});
         updateCount++;
       } else {
         dupCount++;
@@ -1889,9 +1899,10 @@ function tryShopeePreview(){
     const hc=o.items.some(i=>i.name==='ข้าวโพด 6 แว่น');
     const productCost=round2(o.items.reduce((s,i)=>s+i.costPerBag*i.qty,0));
     const packCost=getPackCostFifo(tq,hc,o.date);
-    const fee=round2(o.commission+o.transFee);
+    const revenue=round2(o.revenue);
+    const fee=round2(o.commission+o.transFee+(o.serviceFee||0));
     const totalCost=round2(productCost+packCost+fee);
-    const profit=round2(o.revenue-totalCost);
+    const profit=round2(revenue-totalCost);
     const shippedDt=o.shippedDate?new Date(o.shippedDate):null;
     const stockCutoff=!!(shippedDt && !isNaN(shippedDt.getTime()) && shippedDt>=cutoff);
     if(stockCutoff) cutoffCount++;
@@ -1900,8 +1911,8 @@ function tryShopeePreview(){
       platform:'Shopee', source:'shopee', status:mappedStatus,
       buyerUsername:o.buyerUsername||'', createdTime:o.createdTime||'',
       items:o.items, totalQty:tq, hasCorn6:hc,
-      revenue:o.revenue, productCost, packCost,
-      tiktokFee:fee, feePct:o.revenue>0?round2(fee/o.revenue*100):0, shippingCost:0,
+      revenue, productCost, packCost,
+      tiktokFee:fee, feePct:revenue>0?round2(fee/revenue*100):0, shippingCost:0,
       totalCost, profit, stockCutoff
     });
     newCount++;
@@ -1916,7 +1927,7 @@ function tryShopeePreview(){
 
   document.getElementById('shopee-preview-tbody').innerHTML=[
     ...pendingShopeeStatusUpdates.map(u=>
-    `<tr style="background:rgba(45,111,164,.06)"><td style="font-family:monospace;font-size:.75rem">${u.id.slice(-8)}</td><td>${u.date||''}</td><td style="font-size:.75rem;color:var(--text2)">-</td><td style="max-width:180px;white-space:normal;font-size:.78rem">${u.statusChanged?`<span class="badge ${statusBadge(u.from)}">${u.from}</span> → <span class="badge ${statusBadge(u.to)}">${u.to}</span>`:'👤 อัพเดทชื่อผู้ซื้อ'}</td><td class="text-right">-</td><td class="text-right">฿${(u.revenue||0).toFixed(2)}</td><td class="text-right">-</td><td class="text-right ${(u.profit||0)>=0?'profit-pos':'profit-neg'}">฿${(u.profit||0).toFixed(2)}</td><td style="text-align:center">🔄</td></tr>`),
+    `<tr style="background:rgba(45,111,164,.06)"><td style="font-family:monospace;font-size:.75rem">${u.id.slice(-8)}</td><td>${u.date||''}</td><td style="font-size:.75rem;color:var(--text2)">-</td><td style="max-width:180px;white-space:normal;font-size:.78rem">${u.statusChanged?`<span class="badge ${statusBadge(u.from)}">${u.from}</span> → <span class="badge ${statusBadge(u.to)}">${u.to}</span>`:u.financeChanged?'💰 อัพเดทรายได้/ค่าธรรมเนียม':'👤 อัพเดทชื่อผู้ซื้อ'}</td><td class="text-right">-</td><td class="text-right">฿${(u.revenue||0).toFixed(2)}</td><td class="text-right">-</td><td class="text-right ${(u.profit||0)>=0?'profit-pos':'profit-neg'}">฿${(u.profit||0).toFixed(2)}</td><td style="text-align:center">🔄</td></tr>`),
     ...pendingShopeeOrders.map(o=>
     `<tr><td style="font-family:monospace;font-size:.75rem">${o.id.slice(-8)}</td><td>${o.date}</td><td style="font-size:.75rem;color:var(--text2)">${o.shippedDate||'-'}</td><td style="max-width:180px;white-space:normal;font-size:.78rem">${o.items.map(i=>`${PRODUCT_ICONS[i.name]||''}${i.name}×${i.qty}`).join(', ')}</td><td class="text-right">${o.totalQty}</td><td class="text-right">฿${o.revenue.toFixed(2)}</td><td class="text-right">฿${o.tiktokFee.toFixed(2)}</td><td class="text-right ${o.profit>=0?'profit-pos':'profit-neg'}">฿${o.profit.toFixed(2)}</td><td style="text-align:center">${o.stockCutoff?'✅':'⏭️'}</td></tr>`)
   ].join('');
@@ -1929,10 +1940,19 @@ function confirmShopeeImport(){
   const updated=pendingShopeeStatusUpdates?.length||0;
   if(!S.manualSales) S.manualSales=[];
 
-  // อัปเดตสถานะ + buyerUsername ออเดอร์เดิมที่ Shopee เปลี่ยนไป
+  // อัปเดตสถานะ + buyerUsername + createdTime + revenue/fee ออเดอร์เดิมที่ Shopee เปลี่ยนไป
   (pendingShopeeStatusUpdates||[]).forEach(u=>{
     const o=S.manualSales.find(x=>x.source==='shopee'&&x.id===u.id);
-    if(o){o.status=u.to; if(u.buyerUsername)o.buyerUsername=u.buyerUsername; if(u.createdTime)o.createdTime=u.createdTime;}
+    if(o){
+      o.status=u.to;
+      if(u.buyerUsername)o.buyerUsername=u.buyerUsername;
+      if(u.createdTime)o.createdTime=u.createdTime;
+      if(u.financeChanged){
+        o.revenue=u.newRevenue; o.tiktokFee=u.newFee; o.totalCost=u.newTotalCost;
+        o.profit=round2(u.newRevenue-u.newTotalCost);
+        o.feePct=u.newRevenue>0?round2(u.newFee/u.newRevenue*100):0;
+      }
+    }
   });
 
   (pendingShopeeOrders||[]).forEach(o=>{
