@@ -154,6 +154,7 @@ tbody td{padding:10px 12px}
     </div>
   </div>
   <div id="stock-dry" style="display:none">
+    <div class="card" id="baking-schedule-wrapper"><div class="card-title"><span>📅</span>แนะนำรอบการอบ</div><div id="baking-schedule-card"></div></div>
     <div id="smart-stock-alert"></div>
     <div id="production-suggestion"></div>
     <div class="card"><div class="card-title"><span>🔥</span>บันทึกการอบแห้ง (Lot ใหม่)</div>
@@ -517,6 +518,13 @@ tbody td{padding:10px 12px}
 
 <!-- SETTINGS PAGE -->
 <div id="p-settings" class="page">
+  <div class="card"><div class="card-title"><span>⏰</span>ตั้งค่าเวลาการอบ</div>
+    <div class="form-grid">
+      <div class="form-group"><label>เริ่มอบได้เร็วที่สุด</label><input type="time" id="set-bake-start" value="10:00"></div>
+      <div class="form-group"><label>ต้องเสร็จก่อน</label><input type="time" id="set-bake-end" value="22:00"></div>
+    </div>
+    <div style="margin-top:14px"><button class="btn btn-primary" onclick="saveBakeTimeSettings()">💾 บันทึก</button></div>
+  </div>
   <div class="card"><div class="card-title"><span>🛍️</span>ราคาถุงซอง</div>
     <div class="helper">ฟักทอง → 12x20 | ข้าวโพด 6 แว่น → 15x22 | ที่เหลือ → 12x17</div>
     <div class="form-grid">
@@ -911,7 +919,7 @@ function saveFreshPurchase(){
   valid.forEach(item=>{
     S.freshPurchases.push({id:Date.now()+Math.floor(Math.random()*9999),name:item.name,date,price:item.price,travel:travelPer,qty:item.qty,unit:item.unit,note:item.note,usedQty:0,pricePerUnit:round2((item.price+travelPer)/item.qty)});
   });
-  saveState();renderFreshList();renderFreshStockGrid();
+  saveState();renderFreshList();renderFreshStockGrid();renderBakingSchedule();
   freshBuyItems=[];
   document.getElementById('f-items-list').innerHTML='';
   document.getElementById('f-travel').value='0';
@@ -923,14 +931,15 @@ function getFreshStock(name){return S.freshPurchases.filter(p=>p.name===name&&!p
 function getFreshUnit(name){const p=S.freshPurchases.filter(x=>x.name===name).slice(-1)[0];return p?p.unit:'หน่วย';}
 
 function calcFifoCost(name,qty){
-  const lots=S.freshPurchases.filter(p=>p.name===name&&(p.qty-(p.usedQty||0))>0).sort((a,b)=>a.date.localeCompare(b.date));
+  // ตัด isAdjust (รายการปรับลด/ของเสีย) ออก — ไม่ใช่สต็อกซื้อจริง (ให้ตรงกับ getFreshStock)
+  const lots=S.freshPurchases.filter(p=>p.name===name&&!p.isAdjust&&(p.qty-(p.usedQty||0))>0).sort((a,b)=>a.date.localeCompare(b.date));
   let rem=qty,cost=0,used=[];
   for(const l of lots){if(rem<=0)break;const take=Math.min(l.qty-(l.usedQty||0),rem);cost+=take*l.pricePerUnit;used.push({id:l.id,take});rem-=take;}
   return{totalCost:round2(cost),shortage:rem,used};
 }
 
 function deductFresh(name,qty){
-  const lots=S.freshPurchases.filter(p=>p.name===name&&(p.qty-(p.usedQty||0))>0).sort((a,b)=>a.date.localeCompare(b.date));
+  const lots=S.freshPurchases.filter(p=>p.name===name&&!p.isAdjust&&(p.qty-(p.usedQty||0))>0).sort((a,b)=>a.date.localeCompare(b.date));
   let rem=qty;
   for(const l of lots){if(rem<=0)break;const take=Math.min(l.qty-(l.usedQty||0),rem);l.usedQty=round2((l.usedQty||0)+take);rem-=take;}
 }
@@ -944,7 +953,7 @@ function adjustFreshStock(){
   if(qty>avail){showNotif(`สต็อก${name}เหลือแค่ ${avail.toFixed(1)} หน่วย`,'error');return;}
   const unit=getFreshUnit(name)||'หน่วย';
   // คำนวณต้นทุนที่ปรับลด (FIFO price ก่อน deduct)
-  const costPerUnit=calcFifoCost(name,qty)/qty||0;
+  const costPerUnit=(calcFifoCost(name,qty).totalCost/qty)||0;
   const totalAdjCost=round2(costPerUnit*qty);
   deductFresh(name,qty);
   // Recalc pricePerUnit: ต้นทุนรวมที่เหลือ / จำนวนที่เหลือ
@@ -1327,6 +1336,109 @@ function renderProductionSuggestion(){
     <div style="font-size:.75rem;color:var(--text2);margin-top:10px">* คำนวณจากยอดขาย 30 วันล่าสุด + margin เฉลี่ย</div></div>`;
 }
 
+// ===================== แนะนำรอบการอบ =====================
+const PREP_TIME={'ข้าวโพด':1,'แครอท':1,'ฟักทอง':1,'แอปเปิ้ล':1,'แตงกวา':1,'บล็อคโคลี่':2,'บวบ':1,'กล้วย':1,'ส้มแมนดาริน':1};
+const BAKE_TIME={'ข้าวโพด':15.5,'แครอท':5,'ฟักทอง':3.5,'แอปเปิ้ล':6,'แตงกวา':6,'บล็อคโคลี่':6,'บวบ':6,'กล้วย':10,'ส้มแมนดาริน':10};
+const SHELF_LIFE={'กล้วย':3,'แตงกวา':4,'บวบ':4,'บล็อคโคลี่':4,'ข้าวโพด':4,'ฟักทอง':6,'แอปเปิ้ล':12,'แครอท':12,'ส้มแมนดาริน':12};
+const OVERNIGHT_OK=['ข้าวโพด'];
+
+function getBakingSchedule(){
+  const now=new Date();
+  const startHourBase=S.settings?.bakeStartHour??10;
+  const endHourLimit=S.settings?.bakeEndHour??22;
+  const vel=getStockVelocity();
+  // ผักสด 1 ชนิด (เช่น ข้าวโพด) → สินค้าอบแห้งหลาย variant (ข้าวโพด 3/6 แว่น) → รวมยอด
+  const matchKeys=(obj,name)=>Object.keys(obj||{}).filter(k=>k===name||k.startsWith(name+' '));
+  const results=[];
+  Object.keys(SHELF_LIFE).forEach(name=>{
+    const stock=getFreshStock(name);
+    if(stock<=0) return;
+    const latestPurchase=(S.freshPurchases||[]).filter(p=>p.name===name&&!p.isAdjust&&(p.qty-(p.usedQty||0))>0).sort((a,b)=>b.date.localeCompare(a.date))[0];
+    if(!latestPurchase) return;
+    const purchaseDate=new Date(latestPurchase.date);
+    const daysSincePurchase=Math.max(0,Math.floor((now-purchaseDate)/(1000*60*60*24)));
+    const shelfLife=SHELF_LIFE[name];
+    const daysLeft=Math.max(0,shelfLife-daysSincePurchase);
+    const urgencyPct=Math.min(1,daysSincePurchase/shelfLife);
+    const dryStock=matchKeys(S.stock,name).reduce((s,k)=>s+(S.stock[k]||0),0);
+    const avgSalesPerDay=matchKeys(vel,name).reduce((s,k)=>s+(vel[k]?.avgPerDay||0),0);
+    const dryDaysLeft=avgSalesPerDay>0?dryStock/avgSalesPerDay:999;
+    const urgencyScore=urgencyPct*10;
+    const stockScore=dryDaysLeft<3?3:dryDaysLeft<7?1.5:0;
+    const demandScore=Math.min(avgSalesPerDay*2,4);
+    const totalScore=round2(urgencyScore+stockScore+demandScore);
+    const prepHours=PREP_TIME[name]||1;
+    const bakeHours=BAKE_TIME[name]||6;
+    const totalHours=prepHours+bakeHours;
+    const isOvernight=OVERNIGHT_OK.includes(name);
+    let startHour=startHourBase, isOvernightBake=false;
+    if(startHour+totalHours>endHourLimit){
+      if(isOvernight){ startHour=18; isOvernightBake=true; }
+      else { startHour=null; } // อบไม่ทันในวันเดียว
+    }
+    let level,levelColor,levelIcon;
+    if(daysLeft<=1){level='urgent';levelColor='var(--red)';levelIcon='🔴';}
+    else if(daysLeft<=3){level='soon';levelColor='var(--yellow)';levelIcon='🟠';}
+    else if(daysLeft<=7){level='plan';levelColor='var(--blue)';levelIcon='🟡';}
+    else {level='ok';levelColor='var(--green)';levelIcon='🟢';}
+    results.push({name,stock,daysSincePurchase,daysLeft,shelfLife,prepHours,bakeHours,totalHours,startHour,isOvernightBake,dryStock,level,levelColor,levelIcon,totalScore});
+  });
+  return results.sort((a,b)=>b.totalScore-a.totalScore);
+}
+
+function formatBakeTime(startHour,totalHours,isOvernight){
+  if(startHour===null||startHour===undefined) return '⚠️ อบไม่จบภายในเวลาที่กำหนด — แบ่งหลายวันหรืออบข้ามคืน';
+  const fmt=h=>{const hh=Math.floor(((h%24)+24)%24),mm=Math.round((h%1)*60);return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;};
+  const startStr=fmt(startHour), endStr=fmt(startHour+totalHours);
+  return isOvernight?`เริ่ม ${startStr} → เสร็จ ${endStr} (วันถัดไป) 🌙`:`เริ่ม ${startStr} → เสร็จ ${endStr}`;
+}
+
+function renderBakingSchedule(){
+  const container=document.getElementById('baking-schedule-card');
+  if(!container) return;
+  const schedule=getBakingSchedule();
+  if(!schedule.length){ container.innerHTML='<div class="empty"><div class="ei">✅</div><p>ไม่มีผักสดที่ต้องอบตอนนี้</p></div>'; return; }
+  const fmtHr=h=>`${String(Math.floor(h)).padStart(2,'0')}:${String(Math.round((h%1)*60)).padStart(2,'0')}`;
+  const startHourBase=S.settings?.bakeStartHour??10, endHourLimit=S.settings?.bakeEndHour??22;
+  const renderGroup=(items,title,color)=>{
+    if(!items.length) return '';
+    let g=`<div style="margin-bottom:16px"><div style="font-size:.82rem;font-weight:700;color:${color};margin-bottom:8px">${title}</div>`;
+    items.forEach(s=>{
+      const timeStr=formatBakeTime(s.startHour,s.totalHours,s.isOvernightBake);
+      g+=`<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--surface2);border-radius:8px;margin-bottom:6px;border-left:3px solid ${s.levelColor}">
+        <div style="font-size:1.4rem">${FRESH_ICONS[s.name]||'🌿'}</div>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:.9rem">${s.name}</div>
+          <div style="font-size:.75rem;color:var(--text2);margin-top:2px">ซื้อมา ${s.daysSincePurchase} วัน · เหลือ ${s.stock.toFixed(1)} หน่วย · ถุงอบ ${s.dryStock} ถุง</div>
+          <div style="font-size:.78rem;color:var(--blue);margin-top:3px">🕐 ${timeStr} <span style="color:var(--text2);margin-left:6px">(เตรียม ${s.prepHours}ชม + อบ ${s.bakeHours}ชม)</span></div>
+        </div>
+        <div style="text-align:right;font-size:.78rem">
+          <div style="color:${s.levelColor};font-weight:700">${s.daysLeft<=0?'⚠️ เกินกำหนด!':`เหลือ ${s.daysLeft} วัน`}</div>
+          <div style="color:var(--text2)">อายุ ${s.shelfLife} วัน</div>
+        </div>
+      </div>`;
+    });
+    return g+'</div>';
+  };
+  let html='';
+  html+=renderGroup(schedule.filter(s=>s.level==='urgent'),'🔴 อบวันนี้เลย! (ใกล้เสีย)','var(--red)');
+  html+=renderGroup(schedule.filter(s=>s.level==='soon'),'🟠 ควรอบพรุ่งนี้','var(--yellow)');
+  html+=renderGroup(schedule.filter(s=>s.level==='plan'),'🟡 วางแผนอบใน 3-7 วัน','var(--blue)');
+  html+=renderGroup(schedule.filter(s=>s.level==='ok'),'🟢 ยังไม่ด่วน','var(--green)');
+  html+=`<div style="font-size:.72rem;color:var(--text2);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">* คำนวณจากวันที่ซื้อผักสด + อายุในตู้เย็น + เวลาเตรียม/อบแต่ละชนิด | เริ่มได้ ${fmtHr(startHourBase)} เสร็จก่อน ${fmtHr(endHourLimit)}</div>`;
+  container.innerHTML=html;
+}
+
+function saveBakeTimeSettings(){
+  const start=document.getElementById('set-bake-start').value;
+  const end=document.getElementById('set-bake-end').value;
+  if(start){const[h,m]=start.split(':');S.settings.bakeStartHour=parseInt(h)+parseInt(m)/60;}
+  if(end){const[h,m]=end.split(':');S.settings.bakeEndHour=parseInt(h)+parseInt(m)/60;}
+  saveState();
+  showNotif('บันทึกเวลาอบแล้ว ✅');
+  renderBakingSchedule();
+}
+
 function renderDryStock(){
   const g=document.getElementById('dry-stock-grid');if(!g)return;
   const vel=getStockVelocity();
@@ -1346,6 +1458,7 @@ function renderDryStock(){
   }).join('');
   renderSmartStockAlert();
   renderProductionSuggestion();
+  renderBakingSchedule();
 }
 
 function renderDryLots(){
@@ -2494,6 +2607,9 @@ function renderSettings(){
   document.getElementById('set-delivery-km').value=s.deliveryKm??4;
   document.getElementById('set-car-threshold').value=s.carThreshold??14;
   document.getElementById('set-delivery-start').value=s.deliveryStart??'2026-05-23';
+  const toHM=h=>`${String(Math.floor(h)).padStart(2,'0')}:${String(Math.round((h%1)*60)).padStart(2,'0')}`;
+  document.getElementById('set-bake-start').value=toHM(s.bakeStartHour??10);
+  document.getElementById('set-bake-end').value=toHM(s.bakeEndHour??22);
 }
 function saveBagSettings(){const s=S.settings;s.bag1217=parseFloat(document.getElementById('set-bag1217').value)||0;s.bag1220=parseFloat(document.getElementById('set-bag1220').value)||0;s.bag1522=parseFloat(document.getElementById('set-bag1522').value)||0;s.kanchuean=parseFloat(document.getElementById('set-kanchuean').value)||0;saveState();showNotif('บันทึกแล้ว ✅');}
 function savePackSettings(){const s=S.settings;s.pack1=parseFloat(document.getElementById('set-pack1').value)||1.30;s.pack2=parseFloat(document.getElementById('set-pack2').value)||2.35;s.pack3=parseFloat(document.getElementById('set-pack3').value)||2.95;saveState();showNotif('บันทึกแล้ว ✅');}
