@@ -154,9 +154,11 @@ tbody td{padding:10px 12px}
     </div>
   </div>
   <div id="stock-dry" style="display:none">
-    <div class="card" id="baking-schedule-wrapper"><div class="card-title"><span>📅</span>แนะนำรอบการอบ</div><div id="baking-schedule-card"></div></div>
-    <div id="smart-stock-alert"></div>
-    <div id="production-suggestion"></div>
+    <div class="inner-tabs" id="dry-inner-tabs">
+      <button class="inner-tab active" onclick="showDryInner('dry-main', this)">🥕 จัดการสต็อก</button>
+      <button class="inner-tab" onclick="showDryInner('dry-schedule', this)">📅 แนะนำรอบการอบ</button>
+    </div>
+    <div id="dry-main">
     <div class="card"><div class="card-title"><span>🔥</span>บันทึกการอบแห้ง (Lot ใหม่)</div>
       <div style="font-size:.82rem;font-weight:700;color:var(--text2);margin-bottom:8px">① วัตถุดิบที่ใช้อบ</div>
       <div class="form-grid" style="margin-bottom:12px;grid-template-columns:1fr">
@@ -175,6 +177,8 @@ tbody td{padding:10px 12px}
       <button class="btn btn-primary" onclick="saveDryLot()">💾 บันทึก Lot</button>
     </div>
     <div class="card"><div class="card-title"><span>📦</span>สต็อกผักผลไม้อบแห้งคงเหลือ</div><div id="dry-stock-grid" class="prod-grid"></div></div>
+
+    <div id="production-suggestion"></div>
 
     <div class="card"><div class="card-title"><span>📉</span>ปรับลดถุงอบแห้ง (เสียหาย / ให้แฮม / ตัวอย่าง)</div>
       <div class="helper">ของที่ขายไม่ได้ — ระบบจะตัดสต็อก และบันทึกเป็นค่าใช้จ่ายตามต้นทุน FIFO</div>
@@ -215,6 +219,12 @@ tbody td{padding:10px 12px}
 
     <div class="card"><div class="card-title"><span>🗂️</span>ประวัติ Lot อบแห้ง (FIFO)</div>
       <div class="tbl-wrap"><table><thead><tr><th>วันที่</th><th>วัตถุดิบ</th><th>ต้นทุน</th><th>ค่าไฟ</th><th>ชนิด</th><th>ค่าถุง</th><th>ถุงทั้งหมด</th><th>ขายแล้ว</th><th>เหลือ</th><th>เศษ</th><th>฿/ถุง</th><th></th></tr></thead><tbody id="dry-lots-tbody"></tbody></table></div>
+    </div>
+    </div><!-- /dry-main -->
+
+    <div id="dry-schedule" style="display:none">
+      <div id="smart-stock-alert"></div>
+      <div class="card" id="baking-schedule-wrapper"><div class="card-title"><span>📅</span>แนะนำรอบการอบ</div><div id="baking-schedule-card"></div></div>
     </div>
   </div>
 
@@ -1383,7 +1393,11 @@ function getBakingSchedule(){
     else {level='ok';levelColor='var(--green)';levelIcon='🟢';}
     results.push({name,stock,daysSincePurchase,daysLeft,shelfLife,prepHours,bakeHours,totalHours,startHour,isOvernightBake,dryStock,level,levelColor,levelIcon,totalScore});
   });
-  return results.sort((a,b)=>b.totalScore-a.totalScore);
+  // จัดอันดับตาม score (dense rank: score เท่ากันได้อันดับซ้ำ เช่น 20,20 → 1,1 แล้วถัดไป = 2)
+  const sorted=results.sort((a,b)=>b.totalScore-a.totalScore);
+  let rank=0, prev=Infinity;
+  sorted.forEach(r=>{ if(r.totalScore<prev){ rank++; prev=r.totalScore; } r.rank=rank; });
+  return sorted;
 }
 
 function formatBakeTime(startHour,totalHours,isOvernight){
@@ -1405,10 +1419,12 @@ function renderBakingSchedule(){
     let g=`<div style="margin-bottom:16px"><div style="font-size:.82rem;font-weight:700;color:${color};margin-bottom:8px">${title}</div>`;
     items.forEach(s=>{
       const timeStr=formatBakeTime(s.startHour,s.totalHours,s.isOvernightBake);
-      g+=`<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--surface2);border-radius:8px;margin-bottom:6px;border-left:3px solid ${s.levelColor}">
+      const isTop=s.rank===1;
+      g+=`<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--surface2);border-radius:8px;margin-bottom:6px;border-left:3px solid ${isTop?'var(--accent)':'var(--border)'}">
+        <div title="อันดับ ${s.rank} (score ${s.totalScore})" style="flex:none;width:32px;height:32px;border-radius:50%;background:${isTop?'var(--accent)':'var(--surface)'};border:1.5px solid ${isTop?'var(--accent)':'var(--border)'};color:${isTop?'#fff':'var(--text2)'};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem">${s.rank}</div>
         <div style="font-size:1.4rem">${FRESH_ICONS[s.name]||'🌿'}</div>
         <div style="flex:1">
-          <div style="font-weight:700;font-size:.9rem">${s.name}</div>
+          <div style="font-weight:700;font-size:.9rem">${s.name}<span style="font-size:.7rem;color:var(--text2);font-weight:400;margin-left:6px">score ${s.totalScore}</span></div>
           <div style="font-size:.75rem;color:var(--text2);margin-top:2px">ซื้อมา ${s.daysSincePurchase} วัน · เหลือ ${s.stock.toFixed(1)} หน่วย · ถุงอบ ${s.dryStock} ถุง</div>
           <div style="font-size:.78rem;color:var(--blue);margin-top:3px">🕐 ${timeStr} <span style="color:var(--text2);margin-left:6px">(เตรียม ${s.prepHours}ชม + อบ ${s.bakeHours}ชม)</span></div>
         </div>
@@ -1420,12 +1436,12 @@ function renderBakingSchedule(){
     });
     return g+'</div>';
   };
+  const todayItems=schedule.filter(s=>s.rank===1);   // อันดับ 1 (score สูงสุด — เท่ากันได้หลายตัว)
+  const tomorrowItems=schedule.filter(s=>s.rank>=2);  // อันดับ 2 ลงไป
   let html='';
-  html+=renderGroup(schedule.filter(s=>s.level==='urgent'),'🔴 อบวันนี้เลย! (ใกล้เสีย)','var(--red)');
-  html+=renderGroup(schedule.filter(s=>s.level==='soon'),'🟠 ควรอบพรุ่งนี้','var(--yellow)');
-  html+=renderGroup(schedule.filter(s=>s.level==='plan'),'🟡 วางแผนอบใน 3-7 วัน','var(--blue)');
-  html+=renderGroup(schedule.filter(s=>s.level==='ok'),'🟢 ยังไม่ด่วน','var(--green)');
-  html+=`<div style="font-size:.72rem;color:var(--text2);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">* คำนวณจากวันที่ซื้อผักสด + อายุในตู้เย็น + เวลาเตรียม/อบแต่ละชนิด | เริ่มได้ ${fmtHr(startHourBase)} เสร็จก่อน ${fmtHr(endHourLimit)}</div>`;
+  html+=renderGroup(todayItems,`🔴 อบวันนี้เลย! (อันดับ 1${todayItems.length>1?` · score เท่ากัน ${todayItems.length} ชนิด`:''})`,'var(--red)');
+  html+=renderGroup(tomorrowItems,'🟠 ควรอบพรุ่งนี้ (อันดับ 2 ลงไป)','var(--yellow)');
+  html+=`<div style="font-size:.72rem;color:var(--text2);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">* จัดอันดับด้วย score (ความใกล้เสีย + สต็อกถุงอบเหลือน้อย + ขายดี) · score เท่ากัน = อันดับเดียวกัน | เริ่มได้ ${fmtHr(startHourBase)} เสร็จก่อน ${fmtHr(endHourLimit)}</div>`;
   container.innerHTML=html;
 }
 
@@ -3530,9 +3546,23 @@ function showInnerStock(showId, btn){
   document.getElementById(showId).style.display='';
   btn.closest('.inner-tabs').querySelectorAll('.inner-tab').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  if(showId==='stock-dry'){renderDryStock();renderDryLots();}
+  if(showId==='stock-dry'){
+    renderDryStock();renderDryLots();
+    // reset inner tab กลับ "จัดการสต็อก" ทุกครั้งที่เปิด tab อบแห้ง
+    const firstBtn=document.querySelector('#dry-inner-tabs .inner-tab:first-child');
+    if(firstBtn) showDryInner('dry-main', firstBtn);
+  }
   if(showId==='stock-fresh'){renderFreshList();renderFreshStockGrid();}
   if(showId==='stock-box'){initBoxLots();renderBoxStock();renderBoxLots();}
+}
+function showDryInner(showId, btn){
+  ['dry-main','dry-schedule'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+  const target=document.getElementById(showId);if(target)target.style.display='';
+  const tabs=document.getElementById('dry-inner-tabs');
+  if(tabs)tabs.querySelectorAll('.inner-tab').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  if(showId==='dry-schedule'){renderSmartStockAlert();renderBakingSchedule();}
+  if(showId==='dry-main'){renderDryStock();renderDryLots();}
 }
 
 function showInner(showId,hideId,btn){
