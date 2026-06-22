@@ -871,6 +871,13 @@ function getFifoCost(name){
   const lots=S.dryLots.filter(l=>l.name===name&&(l.totalBags-l.soldBags)>0).sort(lotSort);
   return lots.length?lots[0].costPerBag:(INITIAL_COSTS[name]||0);
 }
+// ต้นทุนเฉลี่ยถ่วงน้ำหนักจากทุก Lot ของชนิดนั้น (รวมของเก่า/ขายหมดแล้วด้วย)
+function getAvgDryCost(name){
+  const lots=S.dryLots.filter(l=>l.name===name&&l.totalBags>0);
+  const totalBags=lots.reduce((s,l)=>s+l.totalBags,0);
+  if(!totalBags) return getFifoCost(name);
+  return round2(lots.reduce((s,l)=>s+l.costPerBag*l.totalBags,0)/totalBags);
+}
 
 // ===================== FRESH STOCK =====================
 let freshBuyItems=[];
@@ -1486,7 +1493,7 @@ function renderDryStock(){
   const g=document.getElementById('dry-stock-grid');if(!g)return;
   const vel=getStockVelocity();
   g.innerHTML=Object.keys(PRODUCT_ICONS).map(name=>{
-    const qty=S.stock[name]||0,cpb=getFifoCost(name),pct=Math.min((qty/30)*100,100);
+    const qty=S.stock[name]||0,cpb=getFifoCost(name),avgCpb=getAvgDryCost(name),pct=Math.min((qty/30)*100,100);
     const cls=qty===0?'stock-low':qty<=5?'stock-med':'';
     const v=vel[name];
     let daysHtml;
@@ -1497,7 +1504,7 @@ function renderDryStock(){
     } else {
       daysHtml=`<div style="font-size:.72rem;color:var(--text2);margin-top:3px">📊 ยังไม่มีข้อมูลขาย</div>`;
     }
-    return `<div class="prod-card ${cls}"><div class="pc-icon">${PRODUCT_ICONS[name]}</div><div class="pc-name">${name}</div><div class="pc-stock">${qty} ถุงเหลือ</div><div class="pc-cost">฿${cpb.toFixed(2)}/ถุง (FIFO)</div>${daysHtml}<div class="stock-bar ${cls}"><div class="stock-fill" style="width:${pct}%"></div></div></div>`;
+    return `<div class="prod-card ${cls}"><div class="pc-icon">${PRODUCT_ICONS[name]}</div><div class="pc-name">${name}</div><div class="pc-stock">${qty} ถุงเหลือ</div><div class="pc-cost">฿${cpb.toFixed(2)}/ถุง (FIFO)</div><div style="font-size:.72rem;color:var(--text2);margin-top:1px">เฉลี่ยทุก Lot ฿${avgCpb.toFixed(2)}/ถุง</div>${daysHtml}<div class="stock-bar ${cls}"><div class="stock-fill" style="width:${pct}%"></div></div></div>`;
   }).join('');
   renderSmartStockAlert();
   renderProductionSuggestion();
