@@ -2324,6 +2324,8 @@ function renderOverview(){
 }
 
 function parseOrderDate(d){if(!d)return new Date(0);if(d.includes('/'))return new Date(d.split('/').reverse().join('-'));return new Date(d);}
+// datetime-local ต้องเป็นเวลา local (ไม่ใช่ UTC) — toISOString() คืน UTC ทำให้เพี้ยน -7 ชม.
+function getLocalDatetimeString(){const now=new Date();return new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,16);}
 function clearOrderFilters(){document.getElementById('filter-status').value='';document.getElementById('filter-platform').value='';document.getElementById('filter-date-from').value='';document.getElementById('filter-date-to').value='';renderOrders();}
 
 function getPlatformLabel(o){
@@ -3722,7 +3724,7 @@ function showPage(id){
   if(id==='p-profit')renderOverview();
   if(id==='p-customers'){renderCustomerBusiness();renderCustomerList();}
   if(id==='p-manual'){renderManualItems();renderManualList();renderDeliveryRounds();renderMergedPacks();renderSelectedCustomer();
-    document.getElementById('dr-datetime').value=new Date().toISOString().slice(0,16);
+    document.getElementById('dr-datetime').value=getLocalDatetimeString();
     renderDeliveryRoundPicker();}
   if(id==='p-stock'){renderFreshList();renderFreshStockGrid();renderDryStock();renderDryLots();initBoxLots();renderBoxStock();renderBoxLots();}
 }
