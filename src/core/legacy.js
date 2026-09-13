@@ -2986,18 +2986,15 @@ function hideLogin(){ const ov=document.getElementById('login-overlay'); if(ov)o
 function loginWithGoogle(){
   const btn=document.getElementById('login-btn'); if(btn){btn.disabled=true;btn.style.opacity='.6';}
   const reset=()=>{ if(btn){btn.disabled=false;btn.style.opacity='1';} };
-  const provider=new firebase.auth.GoogleAuthProvider();
-  firebase.auth().signInWithPopup(provider)
-    .catch(err=>{
-      const code=(err&&err.code)||'';
-      // popup ถูกบล็อก/ไม่รองรับ (มือถือ, in-app browser) → เปลี่ยนไปใช้ redirect แทน
-      if(['auth/popup-blocked','auth/cancelled-popup-request','auth/operation-not-supported-in-this-environment','auth/popup-closed-by-user'].includes(code)){
-        return firebase.auth().signInWithRedirect(provider)
-          .catch(e=>{ showLogin('เข้าสู่ระบบไม่สำเร็จ: '+(e.message||e.code||'')); reset(); });
-      }
-      showLogin('เข้าสู่ระบบไม่สำเร็จ: '+(err.message||code||''));
-      reset();
-    });
+  try{
+    const provider=new firebase.auth.GoogleAuthProvider();
+    // ใช้ redirect เป็นหลัก — เชื่อถือได้ทั้งมือถือ/เดสก์ท็อป (popup มักถูกบล็อกเงียบๆ)
+    firebase.auth().signInWithRedirect(provider)
+      .catch(err=>{ showLogin('เข้าสู่ระบบไม่สำเร็จ: '+(err.message||err.code||'')); reset(); });
+  }catch(e){
+    showLogin('เข้าสู่ระบบไม่สำเร็จ: '+(e.message||e));
+    reset();
+  }
 }
 function logout(){ firebase.auth().signOut().then(()=>location.reload()); }
 
