@@ -2953,12 +2953,14 @@ window.addEventListener('load',function(){
 // ⚠️ allowlist ฝั่ง client เป็นแค่ UX gate — การป้องกันจริงอยู่ที่ Firestore Security Rules (ดู README/คำอธิบาย)
 const ALLOWED_EMAILS=['tanawat.lukkanapinij@gmail.com','littlehamsterhome@gmail.com','mantana1995sp@gmail.com'];
 let appInited=false;
+let _authError='';
 
 function handleAuthChange(user){
-  if(!user){ showLogin(); return; }
+  if(!user){ showLogin(_authError||''); _authError=''; return; }
   const email=(user.email||'').toLowerCase();
   if(!ALLOWED_EMAILS.includes(email)){
-    showLogin(`บัญชี ${user.email} ไม่มีสิทธิ์เข้าใช้งาน`);
+    // ตั้ง error ไว้ให้ค้าง — signOut จะ trigger handleAuthChange(null) ซึ่งจะโชว์ error นี้
+    _authError=`บัญชี ${user.email} ไม่มีสิทธิ์ใช้งาน — กรุณาเข้าสู่ระบบด้วยบัญชีที่ได้รับอนุญาต`;
     firebase.auth().signOut();
     return;
   }
@@ -2986,15 +2988,22 @@ function hideLogin(){ const ov=document.getElementById('login-overlay'); if(ov)o
 function loginWithGoogle(){
   const btn=document.getElementById('login-btn'); if(btn){btn.disabled=true;btn.style.opacity='.6';}
   const reset=()=>{ if(btn){btn.disabled=false;btn.style.opacity='1';} };
-  try{
-    const provider=new firebase.auth.GoogleAuthProvider();
-    // ใช้ redirect เป็นหลัก — เชื่อถือได้ทั้งมือถือ/เดสก์ท็อป (popup มักถูกบล็อกเงียบๆ)
-    firebase.auth().signInWithRedirect(provider)
-      .catch(err=>{ showLogin('เข้าสู่ระบบไม่สำเร็จ: '+(err.message||err.code||'')); reset(); });
-  }catch(e){
-    showLogin('เข้าสู่ระบบไม่สำเร็จ: '+(e.message||e));
-    reset();
-  }
+  const provider=new firebase.auth.GoogleAuthProvider();
+  // popup เป็นหลัก (อยู่หน้าเดิม ไม่มีปัญหา redirect-loop บน GitHub Pages/Safari)
+  firebase.auth().signInWithPopup(provider)
+    .then(()=>reset())
+    .catch(err=>{
+      const code=(err&&err.code)||'';
+      // popup ถูกบล็อก/ไม่รองรับ (in-app browser) → fallback ไป redirect
+      if(['auth/popup-blocked','auth/cancelled-popup-request','auth/operation-not-supported-in-this-environment'].includes(code)){
+        firebase.auth().signInWithRedirect(provider)
+          .catch(e=>{ showLogin('เข้าสู่ระบบไม่สำเร็จ: '+(e.message||e.code||'')); reset(); });
+        return;
+      }
+      // ผู้ใช้ปิด popup เอง — ไม่ต้องแจ้ง error
+      if(code!=='auth/popup-closed-by-user') showLogin('เข้าสู่ระบบไม่สำเร็จ: '+(err.message||code||''));
+      reset();
+    });
 }
 function logout(){ firebase.auth().signOut().then(()=>location.reload()); }
 
