@@ -1,0 +1,164 @@
+<!DOCTYPE html><html lang='th'><head><meta charset='UTF-8'><link href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap' rel='stylesheet'><style>body{margin:0;padding:20px;background:var(--bg)}/* ═══════════════════════════════════════════════════════════════════
+   Base theme — restyled to match the Sakai (PrimeNG / Aura) admin template:
+   white topbar, indigo primary, cool slate surfaces, soft card shadows,
+   Inter typography, 12px cards / 6px controls. The whole app is driven by
+   these CSS variables, so most of the reskin lives in :root below.
+   ═══════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#eff3f8;          /* surface ground (page) */
+  --surface:#ffffff;     /* card / topbar */
+  --surface2:#f1f5f9;    /* surface-100 — table head, tabs, hover */
+  --border:#e2e8f0;      /* surface-200 */
+  --text:#334155;        /* surface-700 */
+  --text2:#64748b;       /* surface-500 (muted) */
+  --accent:#6366f1;      /* primary — indigo-500 */
+  --accent-hover:#4f46e5;/* indigo-600 */
+  --accent-light:#eef2ff;/* indigo-50 */
+  --green:#16a34a;--green-light:#dcfce7;
+  --red:#dc2626;--red-light:#fee2e2;
+  --blue:#2563eb;--blue-light:#dbeafe;
+  --yellow:#f59e0b;
+  --ring:rgba(99,102,241,.25);
+  --shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --radius:12px;
+}
+[data-theme="dark"]{
+  --bg:#0f172a;--surface:#1e293b;--surface2:#273449;--border:#334155;
+  --text:#f1f5f9;--text2:#94a3b8;
+  --accent:#818cf8;--accent-hover:#a5b4fc;--accent-light:#312e81;
+  --green:#4ade80;--green-light:#14532d;
+  --red:#f87171;--red-light:#7f1d1d;
+  --blue:#60a5fa;--blue-light:#1e3a8a;
+  --yellow:#fbbf24;
+  --ring:rgba(129,140,248,.30);
+  --shadow:0 1px 3px rgba(0,0,0,.4);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Inter","IBM Plex Sans Thai",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
+
+/* ── App shell: sidebar + topbar + content (Sakai layout) ────────── */
+.app-layout{display:flex;min-height:100vh}
+.sidebar{width:260px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;z-index:100}
+.side-brand{display:flex;align-items:center;gap:10px;padding:0 20px;height:60px;border-bottom:1px solid var(--border);flex-shrink:0}
+.side-brand-logo{font-size:1.5rem}
+.side-brand-name{font-size:1.05rem;font-weight:700;color:var(--text)}
+.side-menu{display:flex;flex-direction:column;gap:2px;padding:12px;overflow-y:auto}
+.side-item{display:flex;align-items:center;gap:12px;width:100%;padding:11px 14px;border:none;background:none;border-radius:8px;font-family:inherit;font-size:.9rem;font-weight:500;color:var(--text2);cursor:pointer;text-align:left;transition:background .15s,color .15s}
+.side-item:hover{background:var(--surface2);color:var(--text)}
+.side-item.active{background:var(--accent-light);color:var(--accent);font-weight:600}
+.side-item .si-icon{font-size:1.15rem;width:22px;text-align:center;flex-shrink:0}
+
+.main-wrap{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;gap:12px;height:60px;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:90;box-shadow:var(--shadow)}
+.menu-toggle{display:none;background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--text);padding:2px 8px;border-radius:6px;line-height:1}
+.menu-toggle:hover{background:var(--surface2)}
+.topbar-title{font-size:1.05rem;font-weight:700;color:var(--text)}
+.header-sub{font-size:.75rem;color:var(--text2);font-family:"IBM Plex Mono",monospace}
+
+/* ── Profile chip (PrimeNG-style) ────────────────────────────────── */
+.user-chip{display:inline-flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:3px 6px 3px 3px}
+.uc-avatar{width:30px;height:30px;border-radius:50%;object-fit:cover;flex-shrink:0}
+.uc-avatar-fallback{align-items:center;justify-content:center;background:var(--accent);color:#fff;font-size:.85rem;font-weight:600;text-transform:uppercase}
+.uc-name{font-size:.9rem;font-weight:700;color:var(--text);white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis;padding-right:8px}
+
+/* topbar controls: icon button, logout pill, sync dot */
+.icon-btn{width:40px;height:40px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;background:var(--surface);border:1px solid var(--border);border-radius:12px;cursor:pointer;color:var(--text);transition:background .15s,border-color .15s}
+.icon-btn:hover{background:var(--surface2)}
+.btn-logout{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:999px;padding:8px 16px;cursor:pointer;font-size:.88rem;font-weight:600;font-family:inherit;white-space:nowrap;transition:background .15s,border-color .15s,color .15s}
+.btn-logout:hover{border-color:var(--red);color:var(--red);background:var(--red-light)}
+.sync-status{display:inline-flex;align-items:center;gap:7px;font-size:.85rem;font-weight:600;font-family:inherit;white-space:nowrap;margin-left:2px}
+.sync-dot{width:9px;height:9px;border-radius:50%;background:var(--yellow);flex-shrink:0}
+.content{flex:1}
+.sidebar-backdrop{display:none}
+
+.page{display:none;padding:24px;max-width:1200px;margin:0 auto}.page.active{display:block}
+
+@media(max-width:900px){
+  .sidebar{position:fixed;left:0;top:0;transform:translateX(-100%);transition:transform .25s ease;box-shadow:0 0 40px rgba(15,23,42,.18)}
+  .app-layout.sidebar-open .sidebar{transform:translateX(0)}
+  .app-layout.sidebar-open .sidebar-backdrop{display:block;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:99}
+  .menu-toggle{display:inline-flex;align-items:center}
+}
+
+/* ── Cards ───────────────────────────────────────────────────────── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
+.card-title{font-size:.9rem;font-weight:700;color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.stat-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;margin-bottom:20px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+.stat-card .s-label{font-size:.75rem;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.stat-card .s-val{font-family:"IBM Plex Mono",monospace;font-size:1.5rem;font-weight:600;margin-top:4px}
+.stat-card .s-sub{font-size:.75rem;color:var(--text2);margin-top:2px}
+.s-green{color:var(--green)}.s-red{color:var(--red)}.s-accent{color:var(--accent)}.s-blue{color:var(--blue)}
+
+/* ── Forms ───────────────────────────────────────────────────────── */
+.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px}
+.form-group{display:flex;flex-direction:column;gap:6px}
+.form-group label{font-size:.78rem;font-weight:600;color:var(--text2)}
+.form-group input,.form-group select{border:1px solid var(--border);border-radius:6px;padding:9px 12px;font-family:inherit;font-size:.88rem;background:var(--surface);color:var(--text);transition:border-color .15s,box-shadow .15s}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.btn{padding:9px 18px;border:none;border-radius:6px;font-family:inherit;font-size:.88rem;font-weight:600;cursor:pointer;transition:background .15s,filter .15s,box-shadow .15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:var(--accent-hover)}
+.btn-green{background:var(--green);color:#fff}.btn-green:hover{filter:brightness(.93)}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}.btn-outline:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-light)}
+.btn-danger{background:transparent;border:1px solid var(--red);color:var(--red);padding:5px 10px;font-size:.78rem}.btn-danger:hover{background:var(--red-light)}
+.btn-sm{padding:6px 12px;font-size:.8rem}
+
+/* ── Tables ──────────────────────────────────────────────────────── */
+.tbl-wrap{overflow:auto;border:1px solid var(--border);border-radius:12px}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+thead th{background:var(--surface);padding:15px 16px;text-align:left;font-weight:600;font-size:.9rem;color:var(--text);white-space:nowrap;border-bottom:1px solid var(--border)}
+thead th:not(:last-child){border-right:1px solid var(--border)}
+tbody td{padding:14px 16px;border-bottom:1px solid var(--border);color:var(--text);font-weight:400}
+tbody td:not(:last-child){border-right:1px solid var(--border)}
+tbody tr:last-child td{border-bottom:none}
+tbody tr{transition:background .12s}
+tbody tr:hover{background:var(--surface2)}
+.text-right{text-align:right;font-family:"IBM Plex Mono",monospace;font-size:.88rem}
+
+/* ── Badges ──────────────────────────────────────────────────────── */
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.75rem;font-weight:600}
+.badge-done{background:var(--green-light);color:var(--green)}.badge-ship{background:var(--blue-light);color:var(--blue)}.badge-pend{background:var(--accent-light);color:var(--accent)}
+
+.sep{height:1px;background:var(--border);margin:20px 0}
+.helper{background:var(--accent-light);border-left:3px solid var(--accent);padding:10px 14px;border-radius:0 8px 8px 0;font-size:.82rem;line-height:1.6;margin-bottom:16px;color:var(--text)}
+.empty{text-align:center;padding:40px;color:var(--text2)}.empty .ei{font-size:2.5rem;margin-bottom:8px}
+
+.stock-bar{height:6px;border-radius:3px;background:var(--border);overflow:hidden;margin-top:4px}
+.stock-fill{height:100%;border-radius:3px;background:var(--green);transition:width .3s}
+.stock-low .stock-fill{background:var(--red)}.stock-med .stock-fill{background:var(--yellow)}
+
+.prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
+.prod-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;box-shadow:var(--shadow)}
+.prod-card .pc-icon{font-size:1.8rem;margin-bottom:6px}.prod-card .pc-name{font-size:.82rem;font-weight:700}
+.prod-card .pc-stock{font-size:.75rem;color:var(--text2);margin-top:3px}.prod-card .pc-cost{font-size:.78rem;color:var(--accent);font-family:"IBM Plex Mono",monospace;font-weight:600;margin-top:2px}
+.stock-low{border-color:var(--red)}.stock-med{border-color:var(--yellow)}
+
+.upload-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:32px;text-align:center;cursor:pointer;transition:all .2s;background:var(--surface2)}
+.upload-zone:hover{border-color:var(--accent);background:var(--accent-light)}
+.upload-zone .uz-icon{font-size:2.5rem;margin-bottom:8px}.upload-zone .uz-text{font-size:.9rem;font-weight:600;margin-bottom:4px}.upload-zone .uz-sub{font-size:.78rem;color:var(--text2)}
+.file-ready{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--green-light);border-radius:8px;font-size:.85rem;margin-top:8px}
+.profit-pos{color:var(--green);font-weight:700}.profit-neg{color:var(--red);font-weight:700}
+
+/* ── Segmented (inner) tabs ──────────────────────────────────────── */
+.inner-tabs{display:flex;gap:4px;margin-bottom:16px;background:var(--surface2);padding:4px;border-radius:8px;width:fit-content}
+.inner-tab{padding:7px 16px;border:none;background:none;border-radius:6px;font-family:inherit;font-size:.83rem;cursor:pointer;font-weight:500;color:var(--text2);transition:all .15s}
+.inner-tab.active{background:var(--surface);color:var(--accent);font-weight:600;box-shadow:var(--shadow)}
+
+.chart-wrap{position:relative;height:280px}
+
+/* ── Modal / notif ───────────────────────────────────────────────── */
+.modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px}
+.modal-box{background:var(--surface);border-radius:var(--radius);padding:22px;max-width:540px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25);max-height:90vh;overflow-y:auto}
+.modal-head{display:flex;justify-content:space-between;align-items:center;font-size:1.05rem;font-weight:700;margin-bottom:16px;color:var(--text)}
+.modal-x{background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--text2)}
+.notif{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;font-size:.88rem;font-weight:600;z-index:9999;animation:slideIn .3s ease;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.notif-success{background:var(--green);color:#fff}.notif-error{background:var(--red);color:#fff}.notif-info{background:var(--blue);color:#fff}
+@keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+@media(max-width:600px){.page{padding:14px}.stat-row{grid-template-columns:1fr 1fr}.form-grid{grid-template-columns:1fr}.prod-grid{grid-template-columns:repeat(3,1fr)}}
+</style></head><body><div class='card'><div class='card-title' style='font-size:1.25rem;font-weight:600;margin-bottom:16px'>Filtering</div>
+  <div class='tbl-wrap'><table>
+    <thead><tr><th>ชื่อ</th><th>ประเทศ</th><th>ผู้ดูแล</th><th>วันที่</th><th class='text-right'>ยอดสะสม</th><th>ระดับ</th></tr></thead>
+    <tbody><tr><td><b>James Butt</b></td><td>🇩🇿 Algeria</td><td>Ioni Bowcher</td><td>09/13/2015</td><td class='text-right'>฿70,663</td><td><span class='badge badge-done'>🥇 ประจำ</span></td></tr><tr><td><b>Josephine Darakjy</b></td><td>🇪🇬 Egypt</td><td>Amy Elsner</td><td>02/09/2019</td><td class='text-right'>฿82,429</td><td><span class='badge badge-ship'>🔄 ซื้อซ้ำ</span></td></tr><tr><td><b>Art Venere</b></td><td>🇵🇦 Panama</td><td>Asiya Javayant</td><td>05/13/2017</td><td class='text-right'>฿28,334</td><td><span class='badge badge-pend'>🆕 ใหม่</span></td></tr><tr><td><b>Lenna Paprocki</b></td><td>🇸🇮 Slovenia</td><td>Onyama Limba</td><td>11/21/2018</td><td class='text-right'>฿15,282</td><td><span class='badge badge-done'>🥇 ประจำ</span></td></tr></tbody>
+  </table></div></div></body></html>
