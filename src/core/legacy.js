@@ -2934,7 +2934,7 @@ function showNotif(msg,type='success'){
 window.addEventListener('load',function(){
   // Register Service Worker for PWA
   if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('/BaanJaoNoo-Profit/sw.js')
+    navigator.serviceWorker.register(import.meta.env.BASE_URL+'sw.js')
       .then(()=>console.log('SW registered'))
       .catch(err=>console.log('SW error:',err));
   }
@@ -2943,6 +2943,10 @@ window.addEventListener('load',function(){
   loadBuildInfo();
   // ต้องเข้าสู่ระบบด้วย Google ก่อน — เริ่มแอปหลังยืนยันสิทธิ์
   firebase.auth().onAuthStateChanged(handleAuthChange);
+  // เผื่อ login ผ่าน redirect (มือถือ) — ดักerror เช่น domain ไม่อนุญาต มาแสดง
+  firebase.auth().getRedirectResult().catch(err=>{
+    showLogin('เข้าสู่ระบบไม่สำเร็จ: '+(err.message||err.code||''));
+  });
 });
 
 // ===================== AUTH (Google login) =====================
@@ -2981,9 +2985,19 @@ function showLogin(err){
 function hideLogin(){ const ov=document.getElementById('login-overlay'); if(ov)ov.style.display='none'; }
 function loginWithGoogle(){
   const btn=document.getElementById('login-btn'); if(btn){btn.disabled=true;btn.style.opacity='.6';}
-  firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider())
-    .catch(err=>{ showLogin('เข้าสู่ระบบไม่สำเร็จ: '+(err.message||err.code||'')); })
-    .finally(()=>{ if(btn){btn.disabled=false;btn.style.opacity='1';} });
+  const reset=()=>{ if(btn){btn.disabled=false;btn.style.opacity='1';} };
+  const provider=new firebase.auth.GoogleAuthProvider();
+  firebase.auth().signInWithPopup(provider)
+    .catch(err=>{
+      const code=(err&&err.code)||'';
+      // popup ถูกบล็อก/ไม่รองรับ (มือถือ, in-app browser) → เปลี่ยนไปใช้ redirect แทน
+      if(['auth/popup-blocked','auth/cancelled-popup-request','auth/operation-not-supported-in-this-environment','auth/popup-closed-by-user'].includes(code)){
+        return firebase.auth().signInWithRedirect(provider)
+          .catch(e=>{ showLogin('เข้าสู่ระบบไม่สำเร็จ: '+(e.message||e.code||'')); reset(); });
+      }
+      showLogin('เข้าสู่ระบบไม่สำเร็จ: '+(err.message||code||''));
+      reset();
+    });
 }
 function logout(){ firebase.auth().signOut().then(()=>location.reload()); }
 
