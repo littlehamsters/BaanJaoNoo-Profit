@@ -59,7 +59,7 @@ function loadState(){
      dryLots:[...JSON.parse(JSON.stringify(BACKUP_DRYLOTS)),...buildInitLots()],
      boxLots:JSON.parse(JSON.stringify(BOX_INITIAL_LOTS)),
      stock:JSON.parse(JSON.stringify(INITIAL_STOCK)),settings:JSON.parse(JSON.stringify(DEFAULT_SETTINGS)),
-     manualSales:[],dryAdjustments:[],pendingRemnants:{},deliveryRounds:[]};
+     manualSales:[],dryAdjustments:[],pendingRemnants:{},deliveryRounds:[],recipes:[]};
   recalcAllFifo();saveState();
 }
 function saveState(){
@@ -77,6 +77,7 @@ function fixAndRecalc(){
   if(!S.boxAdjustments)S.boxAdjustments=[];
   if(!S.customers)S.customers=[];
   if(!S.mergedPacks)S.mergedPacks=[];
+  if(!S.recipes)S.recipes=[];
   if(!S.boxLots)S.boxLots=JSON.parse(JSON.stringify(BOX_INITIAL_LOTS));
   // ตรวจสอบและเพิ่ม init lots ถ้าหาย
   Object.entries(INITIAL_STOCK).filter(([,q])=>q>0).forEach(([name,qty])=>{

@@ -7,6 +7,7 @@ import {
 } from './state.js';
 import { updateSyncStatus, saveToFirebase, startFirebaseSync, isSyncing } from './firebase.js';
 import { PAGE_IDS, PAGES, PAGE_BY_ID } from '../modules/registry.js';
+import { renderRecipeList } from '../modules/recipes/index.js';
 
 // renderAll lives here (calls the engine's render* fns) but firebase.js needs it
 function renderAll(){
@@ -18,6 +19,7 @@ function renderAll(){
   if(document.getElementById('dr-tbody'))renderDeliveryRounds();
   if(document.getElementById('merged-packs-tbody'))renderMergedPacks();
   if(document.getElementById('cust-tbody'))renderCustomerList();
+  renderRecipeList();
 }
 
 
@@ -2887,6 +2889,7 @@ function showPage(id){
   if(id==='p-settings')renderSettings();
   if(id==='p-profit')renderOverview();
   if(id==='p-customers'){renderCustomerBusiness();renderCustomerList();}
+  if(id==='p-recipes')renderRecipeList();
   if(id==='p-manual'){renderManualItems();renderManualList();renderDeliveryRounds();renderMergedPacks();renderSelectedCustomer();
     document.getElementById('dr-datetime').value=getLocalDatetimeString();
     renderDeliveryRoundPicker();}

@@ -46,6 +46,7 @@ async function saveToFirebase(){
       orderReturns:S.orderReturns||[],boxAdjustments:S.boxAdjustments||[],
       customers:S.customers||[],
       mergedPacks:S.mergedPacks||[],
+      recipes:S.recipes||[],
       updatedAt:new Date().toISOString()
     };
     await DATA_DOC.set(data);

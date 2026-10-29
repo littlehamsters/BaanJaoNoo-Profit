@@ -168,3 +168,33 @@ tbody tr:hover{background:var(--surface2)}
 .notif-success{background:var(--green);color:#fff}.notif-error{background:var(--red);color:#fff}.notif-info{background:var(--blue);color:#fff}
 @keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
 @media(max-width:600px){.page{padding:14px}.stat-row{grid-template-columns:1fr 1fr}.form-grid{grid-template-columns:1fr}.prod-grid{grid-template-columns:repeat(3,1fr)}}
+
+/* recipes module */
+.recipe-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;align-items:start}
+.recipe-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px}
+.rc-head{display:flex;align-items:center;gap:10px}
+.rc-icon{font-size:1.8rem;line-height:1;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:var(--accent-light);border-radius:12px;flex-shrink:0}
+.rc-name{font-weight:700;font-size:1rem;color:var(--text);flex:1;min-width:0;overflow-wrap:anywhere}
+.rc-badges{display:flex;flex-wrap:wrap;gap:6px}
+.rc-badge{background:var(--surface2);color:var(--text2);border-radius:20px;padding:2px 10px;font-size:.75rem;font-weight:600}
+.rc-section{border-top:1px dashed var(--border);padding-top:10px}
+.rc-label{font-size:.72rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px}
+.rc-step{display:flex;align-items:center;gap:6px;font-size:.84rem;margin-bottom:5px;flex-wrap:wrap}
+.rc-step-no{width:20px;height:20px;border-radius:50%;background:var(--accent);color:#fff;font-size:.7rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.rc-step-val{background:var(--surface2);border-radius:6px;padding:1px 8px;font-family:"IBM Plex Mono",monospace;font-size:.8rem;font-weight:600;color:var(--text)}
+.rc-step-note{color:var(--text2);font-size:.8rem}
+.rc-ing{display:flex;justify-content:space-between;gap:10px;font-size:.85rem;padding:3px 0;color:var(--text)}
+.rc-ing-qty{color:var(--text2);font-family:"IBM Plex Mono",monospace;font-size:.8rem;white-space:nowrap}
+.rc-note{font-size:.8rem;color:var(--text2);background:var(--surface2);border-radius:8px;padding:8px 10px;white-space:pre-wrap}
+.recipe-ing-row{display:grid;grid-template-columns:1fr 90px 100px 28px;gap:6px;align-items:center;margin-bottom:8px}
+.recipe-ing-row input,.recipe-ing-row select,.recipe-step-row input,#rm-note{width:100%;min-width:0;border:1px solid var(--border);border-radius:6px;padding:9px 10px;font-family:inherit;font-size:.88rem;background:var(--surface);color:var(--text)}
+.recipe-ing-row input:focus,.recipe-ing-row select:focus,.recipe-step-row input:focus,#rm-note:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--ring)}
+#rm-note{resize:vertical}
+.recipe-step-row{display:grid;grid-template-columns:22px 80px 80px 1fr 28px;gap:6px;align-items:center;margin-bottom:8px}
+.recipe-step-no{font-size:.8rem;font-weight:700;color:var(--accent);text-align:center}
+@media(max-width:520px){.recipe-ing-row{grid-template-columns:1fr 70px 80px 24px}.recipe-step-row{grid-template-columns:18px 64px 64px 1fr 24px}}
+.rm-icons{display:flex;flex-wrap:wrap;gap:6px}
+.rm-icon-opt{width:38px;height:38px;border:1.5px solid var(--border);border-radius:10px;background:var(--surface);font-size:1.2rem;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:border-color .15s,background .15s}
+.rm-icon-opt:hover{border-color:var(--accent)}
+.rm-icon-opt.active{border-color:var(--accent);background:var(--accent-light);box-shadow:0 0 0 2px var(--ring)}
+.rm-icon-auto{width:auto;padding:0 10px;font-size:.8rem;font-family:inherit;font-weight:600;color:var(--text2);gap:4px}

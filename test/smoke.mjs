@@ -33,7 +33,7 @@ const loginShown = await page.evaluate(() => {
   return el ? getComputedStyle(el).display : 'no-element';
 });
 
-// 2b) sidebar built from the registry (7 items)
+// 2b) sidebar built from the registry (8 items)
 const sidebarCount = await page.evaluate(
   () => document.querySelectorAll('#side-menu .side-item').length
 );
@@ -50,7 +50,7 @@ const chip = await page.evaluate(() => {
 // 3) switch to every page via the global showPage (proves handlers work).
 //    Seed a default state first via loadState() — the real app does this in
 //    initApp() after login; page render functions read the global S.
-const PAGES = ['p-stock', 'p-import', 'p-manual', 'p-profit', 'p-customers', 'p-settings', 'p-backup'];
+const PAGES = ['p-stock', 'p-import', 'p-manual', 'p-profit', 'p-customers', 'p-recipes', 'p-settings', 'p-backup'];
 const navResult = await page.evaluate((pages) => {
   const res = {};
   try { window.loadState(); } catch (e) { res._loadState = 'ERROR: ' + e.message; }
@@ -81,7 +81,7 @@ for (const [k, v] of Object.entries(globals)) {
 console.log('\n=== LOGIN OVERLAY display ===\n  ', loginShown, '(expect "flex")');
 
 console.log('\n=== SIDEBAR items ===');
-{ const ok = sidebarCount === 7; if (!ok) failed = true; console.log(`  ${ok ? '✓' : '✗'} ${sidebarCount} items (expect 7)`); }
+{ const ok = sidebarCount === 8; if (!ok) failed = true; console.log(`  ${ok ? '✓' : '✗'} ${sidebarCount} items (expect 8)`); }
 
 console.log('\n=== PROFILE CHIP ===');
 { const ok = chip.exists && chip.hidden; if (!ok) failed = true; console.log(`  ${ok ? '✓' : '✗'} exists:${chip.exists} hidden-until-login:${chip.hidden}`); }

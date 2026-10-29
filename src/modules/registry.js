@@ -22,8 +22,9 @@ export const PAGES = [
   { id: 'p-manual', name: 'บันทึกขายเอง', icon: '📝', order: 3 },
   { id: 'p-profit', name: 'วิเคราะห์กำไร', icon: '📊', order: 4 },
   { id: 'p-customers', name: 'ลูกค้า', icon: '👥', order: 5 },
-  { id: 'p-settings', name: 'ตั้งค่า', icon: '⚙️', order: 6 },
-  { id: 'p-backup', name: 'Export/Import', icon: '💾', order: 7 },
+  { id: 'p-recipes', name: 'สูตรการอบ', icon: '📖', order: 6 },
+  { id: 'p-settings', name: 'ตั้งค่า', icon: '⚙️', order: 7 },
+  { id: 'p-backup', name: 'Export/Import', icon: '💾', order: 8 },
 ].sort((a, b) => a.order - b.order);
 
 export const PAGE_IDS = PAGES.map((p) => p.id);
